@@ -97,3 +97,33 @@ def test_export_get_endpoint() -> None:
     assert "content-disposition" in response.headers
     wb = load_workbook(BytesIO(response.content))
     assert set(wb.sheetnames) == {"SEQUENCES", "METADATA", "QC", "DECODING"}
+
+
+def test_export_head_endpoint() -> None:
+    content = tiny_pdf_bytes(b"export-head-me")
+    encoded = _encode("document-head.pdf", content).json()
+    result_id = encoded["result_id"]
+    response = client.head(f"/api/export?result_id={result_id}")
+    assert response.status_code == 200
+    assert "spreadsheetml" in response.headers["content-type"]
+    assert "content-disposition" in response.headers
+    assert int(response.headers["content-length"]) > 0
+    assert response.content == b""
+
+
+def test_export_survives_in_memory_cache_clear() -> None:
+    from app.main import _CACHE, _LOCK
+
+    content = tiny_pdf_bytes(b"export-disk-me")
+    encoded = _encode("document-disk.pdf", content).json()
+    result_id = encoded["result_id"]
+
+    with _LOCK:
+        _CACHE.clear()
+
+    # After memory cache is cleared, export still succeeds from disk
+    response = client.get(f"/api/export?result_id={result_id}")
+    assert response.status_code == 200
+    wb = load_workbook(BytesIO(response.content))
+    assert set(wb.sheetnames) == {"SEQUENCES", "METADATA", "QC", "DECODING"}
+

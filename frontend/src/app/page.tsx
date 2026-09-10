@@ -62,10 +62,20 @@ export default function HomePage() {
     if (!result?.export_allowed) return;
     setBusy(true);
     setError("");
+    const stem =
+      result.file.original_filename
+        .replace(/\.[^/.]+$/, "")
+        .replace(/[^a-zA-Z0-9_-]/g, "_") || "export";
+    const suggestedFilename = `byte2dna_${stem}.xlsx`;
     try {
-      await downloadXlsx(result.result_id, "byte2dna_export.xlsx");
+      await downloadXlsx(result.result_id, suggestedFilename);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Export failed");
+      try {
+        const directUrl = `${API_BASE}/api/export?result_id=${encodeURIComponent(result.result_id)}`;
+        window.location.assign(directUrl);
+      } catch {
+        setError(err instanceof Error ? err.message : "Export failed");
+      }
     } finally {
       setBusy(false);
     }
@@ -529,10 +539,12 @@ homopolymère ≤ 3`}
             >
               Télécharger XLSX
             </button>
-            {exportEnabled && (
+            {result.export_allowed && (
               <a
                 href={`${API_BASE}/api/export?result_id=${encodeURIComponent(result.result_id)}`}
-                download
+                download={`byte2dna_${result.file.original_filename.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9_-]/g, "_") || "export"}.xlsx`}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="direct-download-link"
               >
                 Téléchargement direct (secours)
