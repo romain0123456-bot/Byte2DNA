@@ -37,6 +37,8 @@ export async function encodeFile(
 }
 
 export async function downloadXlsx(resultId: string, suggestedName: string): Promise<void> {
+  const directUrl = `${API_BASE}/api/export?result_id=${encodeURIComponent(resultId)}`;
+
   let response = await fetch(`${API_BASE}/api/export`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -44,9 +46,7 @@ export async function downloadXlsx(resultId: string, suggestedName: string): Pro
   });
 
   if (!response.ok) {
-    const getResp = await fetch(
-      `${API_BASE}/api/export?result_id=${encodeURIComponent(resultId)}`,
-    ).catch(() => null);
+    const getResp = await fetch(directUrl).catch(() => null);
     if (getResp && getResp.ok) {
       response = getResp;
     } else {
@@ -56,13 +56,17 @@ export async function downloadXlsx(resultId: string, suggestedName: string): Pro
   }
 
   const blob = await response.blob();
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.style.display = "none";
-  link.href = url;
   const header = response.headers.get("content-disposition");
   const match = header?.match(/filename="?([^";]+)"?/);
   const filename = match?.[1]?.replace(/['"]/g, "").trim() || suggestedName;
+
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.style.position = "fixed";
+  link.style.left = "-9999px";
+  link.style.top = "-9999px";
+  link.style.opacity = "0";
+  link.href = url;
   link.download = filename;
   document.body.appendChild(link);
   link.click();
@@ -74,5 +78,5 @@ export async function downloadXlsx(resultId: string, suggestedName: string): Pro
       // ignore if removed
     }
     window.URL.revokeObjectURL(url);
-  }, 1500);
+  }, 2000);
 }

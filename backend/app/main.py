@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import json
+import tempfile
 from collections import OrderedDict
+from pathlib import Path
 from threading import Lock
 from uuid import uuid4
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import ValidationError
@@ -43,6 +46,8 @@ app.add_middleware(
 
 _CACHE: OrderedDict[str, tuple[EncodingResult, RoundtripResult]] = OrderedDict()
 _LOCK = Lock()
+EXPORT_CACHE_DIR = Path(tempfile.gettempdir()) / "byte2dna_exports"
+EXPORT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _store(result: EncodingResult, roundtrip: RoundtripResult) -> str:
@@ -51,6 +56,23 @@ def _store(result: EncodingResult, roundtrip: RoundtripResult) -> str:
         _CACHE[result_id] = (result, roundtrip)
         while len(_CACHE) > RESULT_CACHE_LIMIT:
             _CACHE.popitem(last=False)
+    if roundtrip.result == "PASS":
+        try:
+            payload = build_xlsx(result, roundtrip)
+            fname = export_filename(result.file.original_filename)
+            file_path = EXPORT_CACHE_DIR / f"{result_id}.xlsx"
+            meta_path = EXPORT_CACHE_DIR / f"{result_id}.json"
+            file_path.write_bytes(payload)
+            meta_path.write_text(
+                json.dumps({
+                    "filename": fname,
+                    "original_filename": result.file.original_filename,
+                    "roundtrip": roundtrip.result,
+                }),
+                encoding="utf-8",
+            )
+        except Exception:
+            pass
     return result_id
 
 
@@ -150,28 +172,65 @@ async def encode_file(
     )
 
 
-def _build_export_response(result_id: str) -> Response:
-    result, roundtrip = _load(result_id)
-    if roundtrip.result != "PASS":
-        raise HTTPException(status_code=400, detail="Export disabled: round-trip failed")
-    try:
-        payload = build_xlsx(result, roundtrip)
-    except Exception as exc:  # noqa: BLE001 — convert to a clean API error
-        raise HTTPException(status_code=500, detail="Export failed") from exc
-    filename = export_filename(result.file.original_filename)
+def _build_export_response(result_id: str, is_head: bool = False) -> Response:
+    file_path = EXPORT_CACHE_DIR / f"{result_id}.xlsx"
+    meta_path = EXPORT_CACHE_DIR / f"{result_id}.json"
+
+    payload: bytes | None = None
+    filename: str | None = None
+
+    if file_path.is_file():
+        try:
+            payload = file_path.read_bytes()
+            if meta_path.is_file():
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                filename = meta.get("filename")
+        except Exception:
+            payload = None
+
+    if payload is None:
+        result, roundtrip = _load(result_id)
+        if roundtrip.result != "PASS":
+            raise HTTPException(status_code=400, detail="Export disabled: round-trip failed")
+        try:
+            payload = build_xlsx(result, roundtrip)
+        except Exception as exc:  # noqa: BLE001 — convert to a clean API error
+            raise HTTPException(status_code=500, detail="Export failed") from exc
+        filename = export_filename(result.file.original_filename)
+        try:
+            file_path.write_bytes(payload)
+            meta_path.write_text(
+                json.dumps({
+                    "filename": filename,
+                    "original_filename": result.file.original_filename,
+                    "roundtrip": roundtrip.result,
+                }),
+                encoding="utf-8",
+            )
+        except Exception:
+            pass
+
+    if not filename:
+        filename = f"byte2dna_export_{result_id[:8]}.xlsx"
+
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "Access-Control-Expose-Headers": "Content-Disposition",
+        "Content-Length": str(len(payload)),
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+    }
     return Response(
-        content=payload,
+        content=b"" if is_head else payload,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
-            "Access-Control-Expose-Headers": "Content-Disposition",
-        },
+        headers=headers,
     )
 
 
-@app.get("/api/export")
-def export_xlsx_get(result_id: str) -> Response:
-    return _build_export_response(result_id)
+@app.api_route("/api/export", methods=["GET", "HEAD"])
+def export_xlsx_get(request: Request, result_id: str) -> Response:
+    return _build_export_response(result_id, is_head=(request.method == "HEAD"))
 
 
 @app.post("/api/export")
