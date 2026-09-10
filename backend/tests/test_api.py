@@ -55,6 +55,15 @@ def test_invalid_file_handling() -> None:
     assert _encode("big.pdf", huge).json()["error"] == "File too large"
 
 
+def test_upload_over_5mb_rejected_before_encoding() -> None:
+    oversized = b"%PDF" + b"x" * (5 * 1024 * 1024 + 10)
+    response = _encode("huge.pdf", oversized)
+    assert response.status_code == 400
+    data = response.json()
+    assert data["error"] == "File too large"
+    assert data["detail"] == "File too large"
+
+
 def test_compression_toggle_via_api() -> None:
     content = tiny_pdf_bytes(b"AAAA" * 200)
     on = _encode("c.pdf", content, compression=True).json()

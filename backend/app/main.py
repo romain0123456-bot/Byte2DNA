@@ -14,6 +14,7 @@ from pydantic import ValidationError
 from app.constants import (
     APPLICATION_NAME,
     ENCODING_VERSION,
+    MAX_FILE_SIZE_BYTES,
     PROFILE_NAME,
     RESULT_CACHE_LIMIT,
 )
@@ -79,7 +80,9 @@ async def encode_file(
     gc_max: float = Form(60),
     homopolymer_max: int = Form(3),
 ) -> ApiEncodeResponse:
-    raw = await file.read()
+    raw = await file.read(MAX_FILE_SIZE_BYTES + 1)
+    if len(raw) > MAX_FILE_SIZE_BYTES:
+        raise UploadError("File too large", "File too large")
     filename = validate_upload(file.filename or "upload.bin", raw, file.content_type)
 
     try:

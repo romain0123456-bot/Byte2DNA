@@ -18,7 +18,7 @@ avec `original_bytes == reconstructed_bytes` et SHA-256 identiques.
 Le décodeur ne reçoit **jamais** les octets originaux. Il ne voit que :
 
 - la liste des séquences ADN ;
-- les métadonnées de format (`DecodeMetadata`).
+- les métadonnées de format (`DecodeMetadata`, validées strictement : version, en-tête de variant, taille d'index et paramètres ECC).
 
 ## Composants
 
@@ -36,7 +36,7 @@ Pas de base de données. Les résultats d’encodage sont gardés en mémoire le
 
 ## Encodage d’un fichier
 
-1. Lecture binaire brute (aucun parsing PDF/DOCX).
+1. Validation binaire du fichier (limite 5 Mo appliquée avant lecture complète ; validation conteneur DOCX vérifiant `[Content_Types].xml` et `word/document.xml` sans parsing XML ni extraction disque).
 2. SHA-256 du fichier original (toujours, même si l’export SHA-256 est OFF).
 3. Compression zlib optionnelle.
 4. En-tête interne : `B2D1 | flags | original_size | data_size | payload`.
@@ -56,7 +56,7 @@ Pas de base de données. Les résultats d’encodage sont gardés en mémoire le
 - **Index** : entier big-endian 32 bits, lu après descrambling. Identifiant humain `DNA000001`.
 - **Filler** : nucléotides restants (longueur cible − corps), ignorés au décodage.
 
-Mapping après descrambling :
+Mapping après descrambling (longueur multiple de 4, alphabet strict `A/C/G/T` sans masquage) :
 
 ```text
 00 → A

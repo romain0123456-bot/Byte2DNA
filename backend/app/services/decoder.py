@@ -5,7 +5,7 @@ from __future__ import annotations
 import struct
 import zlib
 
-from app.constants import ENCODING_VERSION, INDEX_BYTES, INNER_MAGIC, VARIANT_HEADER_NT
+from app.constants import ECC_NSYM, ENCODING_VERSION, INDEX_BYTES, INNER_MAGIC, VARIANT_HEADER_NT
 from app.models import DecodeMetadata, Fragment
 from app.services.dna import decode_variant_header, dna_to_bytes, xor_bytes
 from app.services.ecc import decode_ecc
@@ -29,6 +29,8 @@ def _as_sequences(fragments: list[str] | list[Fragment]) -> list[str]:
 def _parse_fragment(sequence: str, metadata: DecodeMetadata) -> tuple[int, bytes]:
     if len(sequence) != metadata.fragment_length:
         raise DecodingError("Decoding failed")
+    if any(base not in "ACGT" for base in sequence):
+        raise DecodingError("Decoding failed")
     try:
         variant = decode_variant_header(sequence[: metadata.variant_header_nt])
     except ValueError as exc:
@@ -40,7 +42,10 @@ def _parse_fragment(sequence: str, metadata: DecodeMetadata) -> tuple[int, bytes
     body_nt = body_bytes_len * 4
     start = metadata.variant_header_nt
     body_dna = sequence[start : start + body_nt]
-    scrambled = dna_to_bytes(body_dna)
+    try:
+        scrambled = dna_to_bytes(body_dna)
+    except ValueError as exc:
+        raise DecodingError("Decoding failed") from exc
     if len(scrambled) != body_bytes_len:
         raise DecodingError("Decoding failed")
     record = xor_bytes(scrambled, variant)
@@ -76,9 +81,19 @@ def decode(fragments: list[str] | list[Fragment], metadata: DecodeMetadata) -> b
     """Reconstruct original bytes from DNA sequences and decode metadata only."""
     if metadata.encoding_version != ENCODING_VERSION:
         raise DecodingError("Decoding failed")
-    if metadata.payload_capacity != payload_capacity(metadata.fragment_length, metadata.ecc):
-        raise DecodingError("Decoding failed")
     if metadata.variant_header_nt != VARIANT_HEADER_NT:
+        raise DecodingError("Decoding failed")
+    if metadata.index_bytes != INDEX_BYTES:
+        raise DecodingError("Decoding failed")
+    if metadata.ecc is True:
+        if metadata.ecc_nsym != ECC_NSYM:
+            raise DecodingError("Decoding failed")
+    elif metadata.ecc is False:
+        if metadata.ecc_nsym != 0:
+            raise DecodingError("Decoding failed")
+    else:
+        raise DecodingError("Decoding failed")
+    if metadata.payload_capacity != payload_capacity(metadata.fragment_length, metadata.ecc):
         raise DecodingError("Decoding failed")
 
     sequences = _as_sequences(fragments)

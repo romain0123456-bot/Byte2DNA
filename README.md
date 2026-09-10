@@ -88,8 +88,11 @@ npm run build
 
 Voir [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-- mapping 2 bits : `00→A`, `01→C`, `10→G`, `11→T` après scrambling XOR déterministe ;
+- mapping 2 bits : `00→A`, `01→C`, `10→G`, `11→T` après scrambling XOR déterministe (alphabet strict `A/C/G/T`, longueur multiple de 4) ;
 - chaque fragment : en-tête de variant (8 nt) + corps scrambé contenant l’index et le payload ;
+- validation stricte des métadonnées de décodage (`DecodeMetadata`) et rejet de toute incohérence ;
+- validation DOCX durcie par vérification de la présence des entrées conteneur ZIP (`[Content_Types].xml` et `word/document.xml`) ;
+- limite de 5 Mo appliquée avant lecture complète en mémoire ;
 - compression optionnelle : `zlib` ;
 - correction d’erreurs optionnelle : Reed-Solomon `reedsolo` (`nsym=8`) par fragment ;
 - profil unique : **Generic POC** (aucun fournisseur de synthèse).

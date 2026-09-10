@@ -1,4 +1,4 @@
-from __future__ import annotations
+import pytest
 
 from app.services.dna import (
     bytes_to_dna,
@@ -18,6 +18,29 @@ def test_mapping_two_bits() -> None:
     # 00 A, 01 C, 10 G, 11 T  — byte 0b00011011 = 0x1B → ACGT
     assert bytes_to_dna(bytes([0b00011011])) == "ACGT"
     assert dna_to_bytes("ACGT") == bytes([0b00011011])
+
+
+def test_dna_to_bytes_strict_length_and_bases() -> None:
+    # ACGT -> PASS
+    assert dna_to_bytes("ACGT") == bytes([0b00011011])
+
+    # ACG -> FAIL (len % 4 != 0)
+    with pytest.raises(ValueError, match="multiple of 4"):
+        dna_to_bytes("ACG")
+
+    # ACGX -> FAIL (invalid base X, not KeyError)
+    with pytest.raises(ValueError, match="Invalid DNA base"):
+        try:
+            dna_to_bytes("ACGX")
+        except KeyError:
+            pytest.fail("KeyError should not leak from dna_to_bytes")
+
+    # NNNN -> FAIL (invalid base N, not KeyError)
+    with pytest.raises(ValueError, match="Invalid DNA base"):
+        try:
+            dna_to_bytes("NNNN")
+        except KeyError:
+            pytest.fail("KeyError should not leak from dna_to_bytes")
 
 
 def test_variant_header_balanced_and_reversible() -> None:

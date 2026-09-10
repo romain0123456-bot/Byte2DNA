@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import io
 import re
+import zipfile
 from pathlib import Path
 
 from app.constants import ALLOWED_EXTENSIONS, MAX_FILE_SIZE_BYTES
@@ -50,4 +52,13 @@ def validate_upload(filename: str, content: bytes, content_type: str | None = No
             "application/zip",
         }:
             raise UploadError("Unsupported file type", "Unsupported file type")
+        try:
+            with zipfile.ZipFile(io.BytesIO(content)) as archive:
+                names = set(archive.namelist())
+                if "[Content_Types].xml" not in names or "word/document.xml" not in names:
+                    raise UploadError("Unsupported file type", "Unsupported file type")
+        except UploadError:
+            raise
+        except Exception as exc:
+            raise UploadError("Unsupported file type", "Unsupported file type") from exc
     return safe_name

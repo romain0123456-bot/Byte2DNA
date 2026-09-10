@@ -1,4 +1,5 @@
-from __future__ import annotations
+import io
+import zipfile
 
 import pytest
 
@@ -40,3 +41,27 @@ def test_reject_mismatched_magic() -> None:
         validate_upload("fake.pdf", b"not-a-pdf")
     with pytest.raises(UploadError):
         validate_upload("fake.docx", b"not-a-zip")
+
+
+def test_real_minimal_docx_container_pass() -> None:
+    docx = tiny_docx_bytes()
+    assert validate_upload("minimal.docx", docx) == "minimal.docx"
+
+
+def test_zip_renamed_docx_without_word_document_xml_fail() -> None:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("[Content_Types].xml", "<Types/>")
+    with pytest.raises(UploadError, match="Unsupported file type"):
+        validate_upload("fake.docx", buf.getvalue())
+
+    buf2 = io.BytesIO()
+    with zipfile.ZipFile(buf2, "w") as z:
+        z.writestr("random.txt", "just a text file")
+    with pytest.raises(UploadError, match="Unsupported file type"):
+        validate_upload("arbitrary.docx", buf2.getvalue())
+
+
+def test_invalid_pk_payload_fail() -> None:
+    with pytest.raises(UploadError, match="Unsupported file type"):
+        validate_upload("invalid_pk.docx", b"PK\x03\x04truncated-junk-pk-bytes")

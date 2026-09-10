@@ -21,13 +21,23 @@ def bytes_to_dna(data: bytes) -> str:
 
 
 def dna_to_bytes(sequence: str) -> bytes:
-    """Inverse of bytes_to_dna. Trailing incomplete bases are ignored."""
+    """Inverse of bytes_to_dna. Requires strict multiple of 4 bases and valid A,C,G,T bases."""
     if not sequence:
         return b""
-    usable = len(sequence) - (len(sequence) % 4)
+    if len(sequence) % 4 != 0:
+        raise ValueError(f"DNA sequence length must be a multiple of 4, got {len(sequence)}")
     out = bytearray()
-    for i in range(0, usable, 4):
-        bits = "".join(BASE_TO_BITS[base] for base in sequence[i : i + 4])
+    for i in range(0, len(sequence), 4):
+        quad = sequence[i : i + 4]
+        try:
+            bits = (
+                BASE_TO_BITS[quad[0]]
+                + BASE_TO_BITS[quad[1]]
+                + BASE_TO_BITS[quad[2]]
+                + BASE_TO_BITS[quad[3]]
+            )
+        except KeyError as exc:
+            raise ValueError(f"Invalid DNA base: {exc.args[0]}") from exc
         out.append(int(bits, 2))
     return bytes(out)
 

@@ -10,6 +10,7 @@ import pytest
 
 from app.models import DecodeMetadata, EncodeConfig, EncodingResult
 from app.services.codec import decode, encode
+from app.services.decoder import DecodingError
 from app.services.dna import sha256_hex
 
 
@@ -105,3 +106,91 @@ def test_sha256_matches() -> None:
     reconstructed = decode([f.sequence for f in result.fragments], result.decode_metadata)
     assert sha256_hex(original) == result.file.sha256_original
     assert sha256_hex(original) == sha256_hex(reconstructed)
+
+
+def test_decode_metadata_strictness() -> None:
+    original = b"strict-metadata-test-payload-12345"
+    result = encode(original, EncodeConfig(ecc=True, compression=True), filename="test.bin")
+    sequences = [f.sequence for f in result.fragments]
+    valid_meta = result.decode_metadata
+
+    # valid metadata -> PASS
+    assert decode(sequences, valid_meta) == original
+
+    # bad encoding_version -> FAIL
+    bad_version = valid_meta.model_copy(update={"encoding_version": "INVALID-VERSION"})
+    with pytest.raises(DecodingError, match="Decoding failed"):
+        decode(sequences, bad_version)
+
+    # bad variant_header_nt -> FAIL
+    bad_vh = valid_meta.model_copy(update={"variant_header_nt": 12})
+    with pytest.raises(DecodingError, match="Decoding failed"):
+        decode(sequences, bad_vh)
+
+    # bad index_bytes -> FAIL
+    bad_idx = valid_meta.model_copy(update={"index_bytes": 2})
+    with pytest.raises(DecodingError, match="Decoding failed"):
+        decode(sequences, bad_idx)
+
+    # bad ecc_nsym when ecc=True -> FAIL
+    bad_ecc_sym = valid_meta.model_copy(update={"ecc_nsym": 4})
+    with pytest.raises(DecodingError, match="Decoding failed"):
+        decode(sequences, bad_ecc_sym)
+
+    # ecc=False with valid ecc_nsym=0 -> PASS
+    result_no_ecc = encode(original, EncodeConfig(ecc=False, compression=True), filename="test.bin")
+    seqs_no_ecc = [f.sequence for f in result_no_ecc.fragments]
+    meta_no_ecc = result_no_ecc.decode_metadata
+    assert decode(seqs_no_ecc, meta_no_ecc) == original
+
+    # ecc=False with bad ecc_nsym != 0 -> FAIL
+    bad_no_ecc_sym = meta_no_ecc.model_copy(update={"ecc_nsym": 8})
+    with pytest.raises(DecodingError, match="Decoding failed"):
+        decode(seqs_no_ecc, bad_no_ecc_sym)
+
+
+def test_decode_invalid_dna_sequence_rejected() -> None:
+    original = b"dna-sequence-strictness-test"
+    result = encode(original, EncodeConfig(), filename="dna.bin")
+    seqs = [f.sequence for f in result.fragments]
+
+    # Non-ACGT base in fragment
+    bad_seqs_char = list(seqs)
+    bad_seqs_char[0] = "X" + bad_seqs_char[0][1:]
+    with pytest.raises(DecodingError, match="Decoding failed"):
+        decode(bad_seqs_char, result.decode_metadata)
+
+    # Bad base 'N'
+    bad_seqs_n = list(seqs)
+    bad_seqs_n[0] = bad_seqs_n[0][:-1] + "N"
+    with pytest.raises(DecodingError, match="Decoding failed"):
+        decode(bad_seqs_n, result.decode_metadata)
+
+    # Truncated sequence (length not matching fragment_length)
+    bad_seqs_len = list(seqs)
+    bad_seqs_len[0] = bad_seqs_len[0][:-2]
+    with pytest.raises(DecodingError, match="Decoding failed"):
+        decode(bad_seqs_len, result.decode_metadata)
+
+
+@pytest.mark.parametrize("size", [1, 17, 101, 513])
+@pytest.mark.parametrize("compression", [True, False])
+@pytest.mark.parametrize("ecc", [True, False])
+@pytest.mark.parametrize("fragment_length", [100, 150, 200])
+def test_last_fragment_padding_and_roundtrip(
+    size: int,
+    compression: bool,
+    ecc: bool,
+    fragment_length: int,
+) -> None:
+    original = bytes((i * 47 + 11) % 256 for i in range(size))
+    config = EncodeConfig(
+        compression=compression,
+        ecc=ecc,
+        fragment_length=fragment_length,
+    )
+    result = encode(original, config, filename="padding_test.bin")
+    sequences = [f.sequence for f in result.fragments]
+    reconstructed = decode(sequences, result.decode_metadata)
+    assert reconstructed == original
+    assert sha256_hex(reconstructed) == sha256_hex(original)
