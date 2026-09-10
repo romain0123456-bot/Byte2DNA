@@ -14,6 +14,10 @@ describe("validateClientFile", () => {
     expect(validateClientFile(file("notes.docx", 64, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")).ok).toBe(true);
   });
 
+  it("accepte un DOC", () => {
+    expect(validateClientFile(file("ancien_document.doc", 64, "application/msword")).ok).toBe(true);
+  });
+
   it("rejette une extension incorrecte", () => {
     const result = validateClientFile(file("notes.txt"));
     expect(result.ok).toBe(false);

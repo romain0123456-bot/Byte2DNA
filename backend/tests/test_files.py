@@ -4,7 +4,7 @@ import zipfile
 import pytest
 
 from app.services.files import UploadError, sanitize_filename, validate_upload
-from tests.conftest import tiny_docx_bytes, tiny_pdf_bytes
+from tests.conftest import tiny_doc_bytes, tiny_docx_bytes, tiny_pdf_bytes
 
 
 def test_sanitize_filename_strips_paths() -> None:
@@ -65,3 +65,21 @@ def test_zip_renamed_docx_without_word_document_xml_fail() -> None:
 def test_invalid_pk_payload_fail() -> None:
     with pytest.raises(UploadError, match="Unsupported file type"):
         validate_upload("invalid_pk.docx", b"PK\x03\x04truncated-junk-pk-bytes")
+
+
+def test_accept_doc_magic() -> None:
+    doc = tiny_doc_bytes()
+    assert validate_upload("document.doc", doc, "application/msword").endswith(".doc")
+    assert validate_upload("document.doc", doc).endswith(".doc")
+
+
+def test_reject_fake_doc() -> None:
+    with pytest.raises(UploadError, match="Unsupported file type"):
+        validate_upload("fake.doc", b"not-an-ole-doc-file")
+
+
+def test_reject_doc_bad_mime() -> None:
+    doc = tiny_doc_bytes()
+    with pytest.raises(UploadError, match="Unsupported file type"):
+        validate_upload("bad_mime.doc", doc, "image/png")
+

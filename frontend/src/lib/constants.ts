@@ -1,5 +1,5 @@
 export const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
-export const ALLOWED_EXTENSIONS = [".pdf", ".docx"] as const;
+export const ALLOWED_EXTENSIONS = [".pdf", ".docx", ".doc"] as const;
 export const API_BASE = "/backend";
 
 export const DEFAULT_PARAMS = {

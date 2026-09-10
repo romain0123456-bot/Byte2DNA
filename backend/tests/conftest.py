@@ -33,3 +33,7 @@ def tiny_docx_bytes(payload: bytes = b"Byte2DNA docx fixture") -> bytes:
         )
         archive.writestr("word/document.xml", payload.decode("latin-1", errors="replace"))
     return buffer.getvalue()
+
+
+def tiny_doc_bytes(payload: bytes = b"Byte2DNA doc fixture") -> bytes:
+    return b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\x00" * 504 + payload

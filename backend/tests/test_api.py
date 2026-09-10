@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from openpyxl import load_workbook
 
 from app.main import app
-from tests.conftest import tiny_docx_bytes, tiny_pdf_bytes
+from tests.conftest import tiny_doc_bytes, tiny_docx_bytes, tiny_pdf_bytes
 
 client = TestClient(app)
 
@@ -35,7 +35,8 @@ def _encode(filename: str, content: bytes, **params: object):
 def test_pdf_and_docx_encode_roundtrip() -> None:
     pdf = tiny_pdf_bytes(b"hello-pdf-bytes")
     docx = tiny_docx_bytes(b"hello-docx-bytes")
-    for name, content in (("sample.pdf", pdf), ("sample.docx", docx)):
+    doc = tiny_doc_bytes(b"hello-doc-bytes")
+    for name, content in (("sample.pdf", pdf), ("sample.docx", docx), ("sample.doc", doc)):
         response = _encode(name, content)
         assert response.status_code == 200, response.text
         body = response.json()

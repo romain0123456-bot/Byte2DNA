@@ -11,6 +11,7 @@ from app.constants import ALLOWED_EXTENSIONS, MAX_FILE_SIZE_BYTES
 
 PDF_MAGIC = b"%PDF"
 DOCX_MAGIC = b"PK"
+DOC_MAGICS = (b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1", b"\xdb\xa5", b"\xec\xa5")
 
 
 class UploadError(ValueError):
@@ -61,4 +62,19 @@ def validate_upload(filename: str, content: bytes, content_type: str | None = No
             raise
         except Exception as exc:
             raise UploadError("Unsupported file type", "Unsupported file type") from exc
+    elif extension == ".doc":
+        if not any(content.startswith(magic) for magic in DOC_MAGICS):
+            raise UploadError("Unsupported file type", "Unsupported file type")
+        if mime and mime not in {
+            "application/msword",
+            "application/doc",
+            "application/vnd.msword",
+            "application/vnd.ms-word",
+            "application/winword",
+            "application/word",
+            "application/x-msw6",
+            "application/x-msword",
+            "application/octet-stream",
+        }:
+            raise UploadError("Unsupported file type", "Unsupported file type")
     return safe_name

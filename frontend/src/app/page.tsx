@@ -124,11 +124,11 @@ export default function HomePage() {
           >
             <strong>Glisser-déposer un fichier</strong>
             <p className="hint">ou cliquer pour choisir un fichier</p>
-            <p className="hint">Formats : PDF, DOCX · Taille max : 5 Mo</p>
+            <p className="hint">Formats : PDF, DOCX, DOC · Taille max : 5 Mo</p>
             <input
               ref={inputRef}
               type="file"
-              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              accept=".pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword"
               data-testid="file-input"
               onChange={(event) => void onFile(event.target.files?.[0] ?? null)}
             />
