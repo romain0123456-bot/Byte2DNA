@@ -93,8 +93,8 @@ export default function HomePage() {
             src="/logo.jpeg"
             alt="Byte2DNA Logo"
             className="logo"
-            width={68}
-            height={68}
+            width={136}
+            height={136}
           />
           <div>
             <p className="kicker">Generic POC · BYTE2DNA-POC-1</p>
