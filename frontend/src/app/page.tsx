@@ -234,6 +234,23 @@ export default function HomePage() {
         </div>
       </section>
 
+      <div className="generate-wrap">
+        <button
+          className="primary"
+          type="button"
+          disabled={busy || !file}
+          onClick={() => void onGenerate()}
+        >
+          Générer et valider les séquences ADN
+        </button>
+        {busy && <p className="progress">Encodage et validation du round-trip en cours…</p>}
+        {error && (
+          <div className="error" data-testid="error">
+            {error}
+          </div>
+        )}
+      </div>
+
       <section className="card guide-card">
         <details className="guide-details" open>
           <summary className="guide-summary">
@@ -457,23 +474,6 @@ homopolymère ≤ 3`}
           </div>
         </details>
       </section>
-
-      <div className="generate-wrap">
-        <button
-          className="primary"
-          type="button"
-          disabled={busy || !file}
-          onClick={() => void onGenerate()}
-        >
-          Générer et valider les séquences ADN
-        </button>
-        {busy && <p className="progress">Encodage et validation du round-trip en cours…</p>}
-        {error && (
-          <div className="error" data-testid="error">
-            {error}
-          </div>
-        )}
-      </div>
 
       {result && (
         <section className="card" data-testid="results">
