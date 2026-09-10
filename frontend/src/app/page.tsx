@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { downloadXlsx, encodeFile } from "@/lib/api";
-import { DEFAULT_PARAMS, type EncodeParams } from "@/lib/constants";
+import { API_BASE, DEFAULT_PARAMS, type EncodeParams } from "@/lib/constants";
 import { formatBytes, sha256File, validateClientFile } from "@/lib/fileValidation";
 import type { EncodeResponse } from "@/lib/types";
 
@@ -77,10 +77,20 @@ export default function HomePage() {
   return (
     <main className="page">
       <header className="hero">
-        <div>
-          <p className="kicker">Generic POC · BYTE2DNA-POC-1</p>
-          <h1>Byte2DNA</h1>
-          <p className="subtitle">Du fichier à la séquence ADN</p>
+        <div className="brand">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo.jpeg"
+            alt="Byte2DNA Logo"
+            className="logo"
+            width={68}
+            height={68}
+          />
+          <div>
+            <p className="kicker">Generic POC · BYTE2DNA-POC-1</p>
+            <h1>Byte2DNA</h1>
+            <p className="subtitle">Du fichier à la séquence ADN</p>
+          </div>
         </div>
         <div className="badge">Stockage numérique expérimental</div>
       </header>
@@ -129,22 +139,28 @@ export default function HomePage() {
             label="Compression"
             value={params.compression}
             disabled={busy}
+            hint="Réduit le nombre de nucléotides via zlib"
             onChange={(compression) => setParams((p) => ({ ...p, compression }))}
           />
           <Toggle
             label="SHA-256 export"
             value={params.includeSha256Export}
             disabled={busy}
+            hint="Consigne les hashs originaux et reconstruits dans le XLSX"
             onChange={(includeSha256Export) => setParams((p) => ({ ...p, includeSha256Export }))}
           />
           <Toggle
             label="Correction d'erreurs"
             value={params.ecc}
             disabled={busy}
+            hint="Reed-Solomon (nsym = 8) par fragment"
             onChange={(ecc) => setParams((p) => ({ ...p, ecc }))}
           />
           <div className="row">
-            <span>Longueur fragment</span>
+            <div>
+              <span>Longueur fragment</span>
+              <p className="field-hint">Taille cible de chaque séquence</p>
+            </div>
             <select
               aria-label="Longueur fragment"
               disabled={busy}
@@ -169,6 +185,7 @@ export default function HomePage() {
                 value={params.gcMin}
                 onChange={(event) => setParams((p) => ({ ...p, gcMin: Number(event.target.value) }))}
               />
+              <span className="field-hint">Borne basse cible</span>
             </label>
             <label className="field">
               GC maximum
@@ -180,6 +197,7 @@ export default function HomePage() {
                 value={params.gcMax}
                 onChange={(event) => setParams((p) => ({ ...p, gcMax: Number(event.target.value) }))}
               />
+              <span className="field-hint">Borne haute cible</span>
             </label>
           </div>
           <div className="row">
@@ -195,6 +213,7 @@ export default function HomePage() {
                   setParams((p) => ({ ...p, homopolymerMax: Number(event.target.value) }))
                 }
               />
+              <span className="field-hint">Répétitions consécutives de la même base</span>
             </label>
           </div>
           <div className="actions">
@@ -203,6 +222,230 @@ export default function HomePage() {
             </button>
           </div>
         </div>
+      </section>
+
+      <section className="card guide-card">
+        <details className="guide-details" open>
+          <summary className="guide-summary">
+            <h2>Comprendre les paramètres de génération</h2>
+            <span className="guide-tag">Informations pédagogiques</span>
+          </summary>
+
+          <div className="guide-content">
+            <div className="guide-item">
+              <h3>1. Compression — ON</h3>
+              <p>Avant de transformer le fichier en ADN, Byte2DNA peut le compresser avec zlib.</p>
+              <p>Par exemple :</p>
+              <pre className="guide-diagram">
+{`Fichier Word : 20 Ko
+       ↓
+    zlib
+       ↓
+Données : 12 Ko
+       ↓
+Encodage ADN`}
+              </pre>
+              <p>Moins d&apos;octets signifie moins de nucléotides à synthétiser.</p>
+              <p>
+                C&apos;est particulièrement intéressant parce que la synthèse physique d&apos;ADN est liée au nombre de bases produites.
+              </p>
+              <p>Le décodeur fait ensuite l&apos;inverse :</p>
+              <div style={{ margin: "8px 0" }}>
+                <span className="guide-mono">ADN → données compressées → zlib → fichier original</span>
+              </div>
+              <span className="guide-recommendation">Je laisserais donc ON pratiquement tout le temps.</span>
+            </div>
+
+            <div className="guide-item">
+              <h3>2. SHA-256 export — ON</h3>
+              <p>Le SHA-256 est l&apos;empreinte numérique de ton fichier.</p>
+              <p>Ton fichier possède par exemple :</p>
+              <pre className="guide-diagram">
+{`SHA-256 original
+a9f63e...42bc
+
+Après le processus :
+PDF
+ ↓
+ADN
+ ↓
+PDF reconstruit
+
+Byte2DNA recalcule :
+SHA-256 reconstruit
+a9f63e...42bc`}
+              </pre>
+              <p>
+                Si :
+              </p>
+              <pre className="guide-diagram">
+{`SHA256 original
+       =
+SHA256 reconstruit`}
+              </pre>
+              <p>tu sais que le fichier reconstruit est strictement identique bit à bit.</p>
+              <p>
+                Le paramètre SHA-256 export ON signifie surtout que cette information est également enregistrée dans le XLSX.
+              </p>
+              <span className="guide-recommendation">Je laisserais toujours ON pour ton POC.</span>
+            </div>
+
+            <div className="guide-item">
+              <h3>3. Correction d&apos;erreurs — ON</h3>
+              <p>C&apos;est déjà plus spécifique au stockage ADN.</p>
+              <p>
+                Une molécule d&apos;ADN synthétisée puis séquencée peut subir des erreurs. Byte2DNA ajoute donc actuellement un petit code Reed-Solomon à chaque fragment.
+              </p>
+              <p>Conceptuellement :</p>
+              <pre className="guide-diagram">
+{`Données
+ABCDEFGH
+
+        ↓ Reed-Solomon
+
+ABCDEFGH + informations de correction`}
+              </pre>
+              <p>
+                Si certaines informations sont altérées, Reed-Solomon peut permettre de les retrouver.
+              </p>
+              <p>Dans ton POC, la configuration actuelle utilise :</p>
+              <pre className="guide-diagram">
+{`Reed-Solomon
+nsym = 8`}
+              </pre>
+              <p>Cela augmente légèrement la quantité d&apos;ADN nécessaire mais apporte de la robustesse.</p>
+              <span className="guide-recommendation">ON est donc le meilleur choix pour ta démonstration.</span>
+              <p className="guide-warning">
+                Attention toutefois : le POC simule cette protection numériquement. Il ne reproduit pas encore tout le comportement réel d&apos;un canal synthèse → stockage → séquençage.
+              </p>
+            </div>
+
+            <div className="guide-item">
+              <h3>4. Longueur fragment — 100 / 150 / 200 nt</h3>
+              <p>C&apos;est la longueur d&apos;une séquence ADN produite.</p>
+              <p><strong>nt</strong> signifie nucléotide.</p>
+              <p>
+                Par exemple : <code>ACGTCAGTACGT...</code> avec exactement 150 caractères donne : <strong>150 nt</strong>.
+              </p>
+              <p>Byte2DNA découpe donc ton fichier en de nombreuses séquences :</p>
+              <pre className="guide-diagram">
+{`DNA000001  150 nt
+DNA000002  150 nt
+DNA000003  150 nt
+DNA000004  150 nt
+...`}
+              </pre>
+              <p><strong>Pourquoi ne pas créer une seule séquence gigantesque ?</strong></p>
+              <p>
+                Parce que la synthèse et le séquençage réels travaillent généralement avec des oligonucléotides courts.
+              </p>
+              <p>Dans Byte2DNA, chaque fragment contient en plus du contenu utile :</p>
+              <pre className="guide-diagram">
+{`┌──────────────────────────────┐
+│ informations d'encodage      │
+├──────────────────────────────┤
+│ index du fragment            │
+├──────────────────────────────┤
+│ données du fichier           │
+├──────────────────────────────┤
+│ Reed-Solomon                 │
+└──────────────────────────────┘
+             150 nt`}
+              </pre>
+              <p>L&apos;index est essentiel car les molécules ne vont pas nécessairement revenir dans l&apos;ordre :</p>
+              <pre className="guide-diagram">
+{`DNA003
+DNA001
+DNA004
+DNA002
+
+Byte2DNA utilise l'index pour reconstruire :
+DNA001
+DNA002
+DNA003
+DNA004`}
+              </pre>
+              <span className="guide-recommendation">Pour ton POC, je choisirais 150 nt. C&apos;est un bon compromis pédagogique.</span>
+            </div>
+
+            <div className="guide-item">
+              <h3>5. GC minimum / maximum</h3>
+              <p>L&apos;ADN contient quatre bases :</p>
+              <p>
+                <strong>A</strong> = Adénine · <strong>C</strong> = Cytosine · <strong>G</strong> = Guanine · <strong>T</strong> = Thymine
+              </p>
+              <p>Le taux GC correspond à la proportion de <strong>G + C</strong> dans la séquence.</p>
+              <p>Prenons : <code>ACGTACGT</code></p>
+              <pre className="guide-diagram">
+{`Il y a :
+A = 2
+C = 2
+G = 2
+T = 2
+
+Donc :
+GC = (2 + 2) / 8
+   = 50 %`}
+              </pre>
+              <p><strong>Pourquoi cela compte ?</strong></p>
+              <p>Une séquence extrêmement déséquilibrée peut être plus problématique à synthétiser ou séquencer.</p>
+              <p>Pour ton profil générique : <strong>GC minimum = 40 % · GC maximum = 60 %</strong>.</p>
+              <p>Byte2DNA essaie donc de produire des fragments compris dans cette zone :</p>
+              <pre className="guide-diagram">
+{`39 % GC  → hors cible
+47 % GC  → OK
+52 % GC  → OK
+63 % GC  → hors cible`}
+              </pre>
+              <span className="guide-recommendation">
+                40–60 % est une bonne plage pour le POC, mais ce n&apos;est pas une règle universelle de tous les prestataires.
+              </span>
+            </div>
+
+            <div className="guide-item">
+              <h3>6. Homopolymère maximum — 3</h3>
+              <p>Un homopolymère est une répétition consécutive de la même base.</p>
+              <p>Par exemple :</p>
+              <pre className="guide-diagram">
+{`ACGTACGT   → max = 1
+ACGTTTAC   → contient TTT   → homopolymère max = 3
+ACGTTTTAC  → contient TTTT  → homopolymère max = 4`}
+              </pre>
+              <p>
+                Avec ton réglage <strong>Homopolymère maximum = 3</strong>, Byte2DNA cherche donc à éviter <code>AAAA</code>, <code>CCCC</code>, <code>GGGG</code>, <code>TTTT</code> et les répétitions encore plus longues.
+              </p>
+              <p>
+                C&apos;est utile car les longues répétitions d&apos;une même base peuvent compliquer certaines opérations de synthèse/séquençage.
+              </p>
+            </div>
+
+            <div className="guide-item highlight">
+              <h3>Ce que fait Byte2DNA avec GC et homopolymères</h3>
+              <p>C&apos;est une partie intéressante de ton POC.</p>
+              <p>Byte2DNA ne se contente pas de faire :</p>
+              <pre className="guide-diagram">
+{`00 → A
+01 → C
+10 → G
+11 → T`}
+              </pre>
+              <p>
+                Il peut essayer jusqu&apos;à <strong>256 variantes déterministes</strong> de l&apos;encodage d&apos;un fragment pour trouver une représentation qui respecte mieux :
+              </p>
+              <pre className="guide-diagram">
+{`GC = 40–60 %
+ET
+homopolymère ≤ 3`}
+              </pre>
+              <p>
+                Donc plusieurs représentations ADN possibles des mêmes données sont essayées, tout en restant parfaitement réversibles.
+              </p>
+              <p>
+                Le numéro de variante est conservé dans le fragment afin que le décodeur sache exactement comment revenir aux données originales.
+              </p>
+            </div>
+          </div>
+        </details>
       </section>
 
       <div className="generate-wrap">
@@ -276,15 +519,26 @@ export default function HomePage() {
             <div className="warning-banner">{result.export_warning}</div>
           )}
 
-          <button
-            className="secondary"
-            type="button"
-            data-testid="export-button"
-            disabled={!exportEnabled}
-            onClick={() => void onExport()}
-          >
-            Télécharger XLSX
-          </button>
+          <div className="export-actions">
+            <button
+              className="secondary"
+              type="button"
+              data-testid="export-button"
+              disabled={!exportEnabled}
+              onClick={() => void onExport()}
+            >
+              Télécharger XLSX
+            </button>
+            {exportEnabled && (
+              <a
+                href={`${API_BASE}/api/export?result_id=${encodeURIComponent(result.result_id)}`}
+                download
+                className="direct-download-link"
+              >
+                Téléchargement direct (secours)
+              </a>
+            )}
+          </div>
 
           <h2 style={{ marginTop: 24 }}>Aperçu des fragments</h2>
           <table>
@@ -327,15 +581,20 @@ function Toggle({
   value,
   onChange,
   disabled,
+  hint,
 }: {
   label: string;
   value: boolean;
   disabled?: boolean;
   onChange: (value: boolean) => void;
+  hint?: string;
 }) {
   return (
     <div className="row">
-      <span>{label}</span>
+      <div>
+        <span>{label}</span>
+        {hint && <p className="field-hint">{hint}</p>}
+      </div>
       <button
         type="button"
         className={`toggle${value ? " on" : ""}`}

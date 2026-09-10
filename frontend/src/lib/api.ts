@@ -37,24 +37,42 @@ export async function encodeFile(
 }
 
 export async function downloadXlsx(resultId: string, suggestedName: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/api/export`, {
+  let response = await fetch(`${API_BASE}/api/export`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ result_id: resultId }),
   });
+
   if (!response.ok) {
-    const payload = (await response.json().catch(() => ({}))) as ApiError;
-    throw new Error(errorMessage(payload, "Export failed"));
+    const getResp = await fetch(
+      `${API_BASE}/api/export?result_id=${encodeURIComponent(resultId)}`,
+    ).catch(() => null);
+    if (getResp && getResp.ok) {
+      response = getResp;
+    } else {
+      const payload = (await response.json().catch(() => ({}))) as ApiError;
+      throw new Error(errorMessage(payload, "Export failed"));
+    }
   }
+
   const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
+  const url = window.URL.createObjectURL(blob);
   const link = document.createElement("a");
+  link.style.display = "none";
   link.href = url;
   const header = response.headers.get("content-disposition");
-  const match = header?.match(/filename="([^"]+)"/);
-  link.download = match?.[1] || suggestedName;
+  const match = header?.match(/filename="?([^";]+)"?/);
+  const filename = match?.[1]?.replace(/['"]/g, "").trim() || suggestedName;
+  link.download = filename;
   document.body.appendChild(link);
   link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+
+  setTimeout(() => {
+    try {
+      document.body.removeChild(link);
+    } catch {
+      // ignore if removed
+    }
+    window.URL.revokeObjectURL(url);
+  }, 1500);
 }

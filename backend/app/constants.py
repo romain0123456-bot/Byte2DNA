@@ -32,4 +32,4 @@ GC_WARNING_MARGIN = 5.0
 HOMOPOLYMER_WARNING_EXTRA = 1
 
 # In-memory export cache lifetime is process-local (POC, no database).
-RESULT_CACHE_LIMIT = 8
+RESULT_CACHE_LIMIT = 128

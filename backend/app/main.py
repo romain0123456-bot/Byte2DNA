@@ -27,9 +27,18 @@ from app.services.validator import validate_roundtrip
 app = FastAPI(title=APPLICATION_NAME, version=ENCODING_VERSION)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:3000", "http://localhost:3000"],
+    allow_origins=[
+        "http://127.0.0.1:3000",
+        "http://localhost:3000",
+        "http://127.0.0.1:3001",
+        "http://localhost:3001",
+        "http://127.0.0.1:3002",
+        "http://localhost:3002",
+    ],
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$",
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
 )
 
 _CACHE: OrderedDict[str, tuple[EncodingResult, RoundtripResult]] = OrderedDict()
@@ -141,9 +150,8 @@ async def encode_file(
     )
 
 
-@app.post("/api/export")
-def export_xlsx(body: ExportRequest) -> Response:
-    result, roundtrip = _load(body.result_id)
+def _build_export_response(result_id: str) -> Response:
+    result, roundtrip = _load(result_id)
     if roundtrip.result != "PASS":
         raise HTTPException(status_code=400, detail="Export disabled: round-trip failed")
     try:
@@ -154,5 +162,18 @@ def export_xlsx(body: ExportRequest) -> Response:
     return Response(
         content=payload,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
     )
+
+
+@app.get("/api/export")
+def export_xlsx_get(result_id: str) -> Response:
+    return _build_export_response(result_id)
+
+
+@app.post("/api/export")
+def export_xlsx(body: ExportRequest) -> Response:
+    return _build_export_response(body.result_id)

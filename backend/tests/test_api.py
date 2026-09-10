@@ -85,3 +85,15 @@ def test_export_requires_roundtrip_and_has_sheets() -> None:
 
     missing = client.post("/api/export", json={"result_id": "0" * 32})
     assert missing.status_code == 404
+
+
+def test_export_get_endpoint() -> None:
+    content = tiny_pdf_bytes(b"export-get-me")
+    encoded = _encode("document-get.pdf", content).json()
+    result_id = encoded["result_id"]
+    response = client.get(f"/api/export?result_id={result_id}")
+    assert response.status_code == 200
+    assert "spreadsheetml" in response.headers["content-type"]
+    assert "content-disposition" in response.headers
+    wb = load_workbook(BytesIO(response.content))
+    assert set(wb.sheetnames) == {"SEQUENCES", "METADATA", "QC", "DECODING"}
