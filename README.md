@@ -1,8 +1,5 @@
 # Byte2DNA
 
-![Uploading Gemini_Generated_Image_g529djg529djg529.jpeg…]()
-
-
 **Byte2DNA** est un POC de stockage numérique sur ADN.
 
 Il permet d’importer un fichier PDF ou DOCX, de convertir son contenu binaire en séquences ADN numériques composées de `A`, `C`, `G` et `T`, de contrôler des paramètres simples comme le taux GC et les homopolymères, de vérifier la reconstruction exacte du fichier par comparaison SHA-256, puis d’exporter les séquences dans un fichier XLSX destiné à préparer une future synthèse physique d’ADN.
