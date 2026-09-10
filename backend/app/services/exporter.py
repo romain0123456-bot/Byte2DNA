@@ -62,7 +62,7 @@ def _sequences_sheet(wb: Workbook, result: EncodingResult) -> None:
     ]
     sheet.append(headers)
     _style_header(sheet, len(headers))
-    for fragment in result.fragments:
+    for row_idx, fragment in enumerate(result.fragments, start=2):
         sheet.append(
             [
                 fragment.fragment_id,
@@ -76,7 +76,7 @@ def _sequences_sheet(wb: Workbook, result: EncodingResult) -> None:
                 fragment.status,
             ]
         )
-        status_cell = sheet.cell(sheet.max_row, 9)
+        status_cell = sheet.cell(row=row_idx, column=9)
         if fragment.status == "WARNING":
             status_cell.fill = WARN_FILL
         elif fragment.status == "INVALID":

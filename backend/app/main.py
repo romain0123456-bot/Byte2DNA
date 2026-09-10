@@ -9,7 +9,7 @@ from pathlib import Path
 from threading import Lock
 from uuid import uuid4
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import ValidationError
@@ -56,24 +56,26 @@ def _store(result: EncodingResult, roundtrip: RoundtripResult) -> str:
         _CACHE[result_id] = (result, roundtrip)
         while len(_CACHE) > RESULT_CACHE_LIMIT:
             _CACHE.popitem(last=False)
-    if roundtrip.result == "PASS":
-        try:
-            payload = build_xlsx(result, roundtrip)
-            fname = export_filename(result.file.original_filename)
-            file_path = EXPORT_CACHE_DIR / f"{result_id}.xlsx"
-            meta_path = EXPORT_CACHE_DIR / f"{result_id}.json"
-            file_path.write_bytes(payload)
-            meta_path.write_text(
-                json.dumps({
-                    "filename": fname,
-                    "original_filename": result.file.original_filename,
-                    "roundtrip": roundtrip.result,
-                }),
-                encoding="utf-8",
-            )
-        except Exception:
-            pass
     return result_id
+
+
+def _persist_export_to_disk(result_id: str, result: EncodingResult, roundtrip: RoundtripResult) -> None:
+    try:
+        payload = build_xlsx(result, roundtrip)
+        fname = export_filename(result.file.original_filename)
+        file_path = EXPORT_CACHE_DIR / f"{result_id}.xlsx"
+        meta_path = EXPORT_CACHE_DIR / f"{result_id}.json"
+        file_path.write_bytes(payload)
+        meta_path.write_text(
+            json.dumps({
+                "filename": fname,
+                "original_filename": result.file.original_filename,
+                "roundtrip": roundtrip.result,
+            }),
+            encoding="utf-8",
+        )
+    except Exception:
+        pass
 
 
 def _load(result_id: str) -> tuple[EncodingResult, RoundtripResult]:
@@ -102,6 +104,7 @@ def health() -> dict[str, str]:
 
 @app.post("/api/encode", response_model=ApiEncodeResponse)
 async def encode_file(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     compression: str = Form("true"),
     include_sha256_export: str = Form("true"),
@@ -146,6 +149,8 @@ async def encode_file(
         export_warning = "Séquences nécessitant une revue avant synthèse"
     if not export_allowed:
         export_warning = "EXPORT DISABLED"
+    if export_allowed:
+        background_tasks.add_task(_persist_export_to_disk, result_id, result, roundtrip)
 
     return ApiEncodeResponse(
         encoding_version=ENCODING_VERSION,

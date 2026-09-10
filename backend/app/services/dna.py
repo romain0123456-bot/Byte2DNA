@@ -3,8 +3,17 @@
 from __future__ import annotations
 
 import hashlib
+from functools import lru_cache
 
 from app.constants import BASE_TO_BITS, BITS_TO_BASE, ENCODING_VERSION, VARIANT_HEADER_NT
+
+_BYTE_TO_DNA = [
+    BITS_TO_BASE[f"{(b >> 6) & 3:02b}"]
+    + BITS_TO_BASE[f"{(b >> 4) & 3:02b}"]
+    + BITS_TO_BASE[f"{(b >> 2) & 3:02b}"]
+    + BITS_TO_BASE[f"{b & 3:02b}"]
+    for b in range(256)
+]
 
 
 def sha256_hex(data: bytes) -> str:
@@ -13,11 +22,7 @@ def sha256_hex(data: bytes) -> str:
 
 def bytes_to_dna(data: bytes) -> str:
     """Map each byte to four bases using 00=A, 01=C, 10=G, 11=T."""
-    parts: list[str] = []
-    for byte in data:
-        for shift in (6, 4, 2, 0):
-            parts.append(BITS_TO_BASE[f"{(byte >> shift) & 0b11:02b}"])
-    return "".join(parts)
+    return "".join(_BYTE_TO_DNA[b] for b in data)
 
 
 def dna_to_bytes(sequence: str) -> bytes:
@@ -42,6 +47,7 @@ def dna_to_bytes(sequence: str) -> bytes:
     return bytes(out)
 
 
+@lru_cache(maxsize=1024)
 def keystream(variant: int, length: int) -> bytes:
     """Deterministic SHA-256 counter keystream bound to BYTE2DNA-POC-1."""
     if length <= 0:

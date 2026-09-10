@@ -54,24 +54,28 @@ def _pad_sequence(sequence: str, target: int, variant: int) -> str:
 
 
 def _build_sequence(index: int, chunk: bytes, variant: int, config: EncodeConfig) -> str:
+    body_bytes = _build_body_bytes(index, chunk, config.ecc)
     header = encode_variant_header(variant)
-    body = xor_bytes(_build_body_bytes(index, chunk, config.ecc), variant)
+    body = xor_bytes(body_bytes, variant)
     return _pad_sequence(header + bytes_to_dna(body), config.fragment_length, variant)
 
 
 def _select_variant(index: int, chunk: bytes, config: EncodeConfig) -> tuple[str, int, str]:
+    body_bytes = _build_body_bytes(index, chunk, config.ecc)
     best: tuple[tuple[int, float], str, int, str] | None = None
     for variant in range(MAX_VARIANTS):
-        sequence = _build_sequence(index, chunk, variant, config)
+        header = encode_variant_header(variant)
+        body = xor_bytes(body_bytes, variant)
+        sequence = _pad_sequence(header + bytes_to_dna(body), config.fragment_length, variant)
         gc = gc_percent(sequence)
         hp = max_homopolymer(sequence)
         status = classify_status(gc, hp, config)
+        if status == "VALID":
+            return sequence, variant, status
         score = constraint_score(gc, hp, config)
         candidate = (score, sequence, variant, status)
         if best is None or candidate[0] < best[0]:
             best = candidate
-        if status == "VALID":
-            return sequence, variant, status
     assert best is not None
     return best[1], best[2], best[3]
 
