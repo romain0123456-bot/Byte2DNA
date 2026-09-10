@@ -15,6 +15,7 @@ export default function HomePage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>("");
   const [result, setResult] = useState<EncodeResponse | null>(null);
+  const [showGuide, setShowGuide] = useState(false);
 
   const fileLabel = useMemo(() => {
     if (!file) return null;
@@ -252,13 +253,40 @@ export default function HomePage() {
       </div>
 
       <section className="card guide-card">
-        <details className="guide-details" open>
-          <summary className="guide-summary">
+        <div
+          className="guide-header"
+          role="button"
+          tabIndex={0}
+          onClick={() => setShowGuide((prev) => !prev)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setShowGuide((prev) => !prev);
+            }
+          }}
+          aria-expanded={showGuide}
+          aria-controls="guide-content"
+          data-testid="toggle-guide-header"
+        >
+          <div className="guide-header-title">
+            <span className="guide-icon">💡</span>
             <h2>Comprendre les paramètres de génération</h2>
             <span className="guide-tag">Informations pédagogiques</span>
-          </summary>
+          </div>
+          <button
+            type="button"
+            className="guide-toggle-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowGuide((prev) => !prev);
+            }}
+          >
+            {showGuide ? "Masquer les explications ▲" : "Afficher les explications ▼"}
+          </button>
+        </div>
 
-          <div className="guide-content">
+        {showGuide && (
+          <div className="guide-content" id="guide-content">
             <div className="guide-item">
               <h3>1. Compression — ON</h3>
               <p>Avant de transformer le fichier en ADN, Byte2DNA peut le compresser avec zlib.</p>
@@ -471,8 +499,18 @@ homopolymère ≤ 3`}
                 Le numéro de variante est conservé dans le fragment afin que le décodeur sache exactement comment revenir aux données originales.
               </p>
             </div>
+
+            <div className="guide-footer-actions">
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => setShowGuide(false)}
+              >
+                Masquer les explications ▲
+              </button>
+            </div>
           </div>
-        </details>
+        )}
       </section>
 
       {result && (

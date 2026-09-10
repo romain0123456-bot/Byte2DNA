@@ -150,4 +150,18 @@ describe("Byte2DNA page", () => {
     await user.click(screen.getByRole("button", { name: "Réinitialiser les paramètres" }));
     expect(screen.getAllByRole("button", { name: "ON" })).toHaveLength(3);
   });
+
+  it("permet d'afficher et de masquer les informations pédagogiques", async () => {
+    const user = userEvent.setup();
+    render(<HomePage />);
+    expect(screen.queryByText("1. Compression — ON")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Afficher les explications ▼" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Afficher les explications ▼" }));
+    expect(screen.getByText("1. Compression — ON")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Masquer les explications ▲" })).toHaveLength(2);
+
+    await user.click(screen.getAllByRole("button", { name: "Masquer les explications ▲" })[0]);
+    expect(screen.queryByText("1. Compression — ON")).not.toBeInTheDocument();
+  });
 });

@@ -365,22 +365,31 @@ td.num {
 
 .guide-card {
   margin-top: 24px;
+  transition: all 0.2s ease;
 }
 
-.guide-details summary {
+.guide-header {
   cursor: pointer;
-  list-style: none;
   display: flex;
   justify-content: space-between;
   align-items: center;
   user-select: none;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.guide-details summary::-webkit-details-marker {
-  display: none;
+.guide-header-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.guide-summary h2 {
+.guide-icon {
+  font-size: 20px;
+}
+
+.guide-header h2 {
   margin: 0;
   font-size: 18px;
 }
@@ -392,6 +401,30 @@ td.num {
   color: var(--teal-dark);
   border-radius: 999px;
   font-weight: 600;
+}
+
+.guide-toggle-btn {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 10px;
+  background: #e7f4f4;
+  color: var(--teal-dark);
+  border: 1px solid #bad9d9;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.guide-toggle-btn:hover {
+  background: #d4ecec;
+  border-color: var(--teal);
+  color: var(--ink);
+}
+
+.guide-footer-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
 }
 
 .guide-content {
