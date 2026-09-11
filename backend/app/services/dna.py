@@ -16,6 +16,9 @@ _BYTE_TO_DNA = [
 ]
 
 
+_QUAD_TO_BYTE = {_quad: _b for _b, _quad in enumerate(_BYTE_TO_DNA)}
+
+
 def sha256_hex(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -31,20 +34,10 @@ def dna_to_bytes(sequence: str) -> bytes:
         return b""
     if len(sequence) % 4 != 0:
         raise ValueError(f"DNA sequence length must be a multiple of 4, got {len(sequence)}")
-    out = bytearray()
-    for i in range(0, len(sequence), 4):
-        quad = sequence[i : i + 4]
-        try:
-            bits = (
-                BASE_TO_BITS[quad[0]]
-                + BASE_TO_BITS[quad[1]]
-                + BASE_TO_BITS[quad[2]]
-                + BASE_TO_BITS[quad[3]]
-            )
-        except KeyError as exc:
-            raise ValueError(f"Invalid DNA base: {exc.args[0]}") from exc
-        out.append(int(bits, 2))
-    return bytes(out)
+    try:
+        return bytes(_QUAD_TO_BYTE[sequence[i : i + 4]] for i in range(0, len(sequence), 4))
+    except KeyError as exc:
+        raise ValueError(f"Invalid DNA base: {exc.args[0]}") from exc
 
 
 @lru_cache(maxsize=1024)
@@ -67,13 +60,7 @@ def xor_bytes(data: bytes, variant: int) -> bytes:
     return bytes(a ^ b for a, b in zip(data, stream))
 
 
-def encode_variant_header(variant: int) -> str:
-    """Encode 0..255 as 8 nt: even positions C/G, odd positions A/T.
-
-    Guarantees GC = 50% and max homopolymer = 1 for the header itself.
-    """
-    if not 0 <= variant < 256:
-        raise ValueError("variant must be in 0..255")
+def _generate_variant_header(variant: int) -> str:
     bases: list[str] = []
     for i in range(VARIANT_HEADER_NT):
         bit = (variant >> (VARIANT_HEADER_NT - 1 - i)) & 1
@@ -82,6 +69,19 @@ def encode_variant_header(variant: int) -> str:
         else:
             bases.append("A" if bit == 0 else "T")
     return "".join(bases)
+
+
+_VARIANT_HEADERS = tuple(_generate_variant_header(v) for v in range(256))
+
+
+def encode_variant_header(variant: int) -> str:
+    """Encode 0..255 as 8 nt: even positions C/G, odd positions A/T.
+
+    Guarantees GC = 50% and max homopolymer = 1 for the header itself.
+    """
+    if not 0 <= variant < 256:
+        raise ValueError("variant must be in 0..255")
+    return _VARIANT_HEADERS[variant]
 
 
 def decode_variant_header(header: str) -> int:

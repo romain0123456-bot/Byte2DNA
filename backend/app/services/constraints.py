@@ -9,7 +9,7 @@ from app.models import EncodeConfig, FragmentStatus
 def gc_percent(sequence: str) -> float:
     if not sequence:
         return 0.0
-    gc = sum(1 for base in sequence if base in ("G", "C"))
+    gc = sequence.count("G") + sequence.count("C")
     return round(100.0 * gc / len(sequence), 4)
 
 

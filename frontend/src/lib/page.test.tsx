@@ -164,4 +164,63 @@ describe("Byte2DNA page", () => {
     await user.click(screen.getAllByRole("button", { name: "Masquer les explications ▲" })[0]);
     expect(screen.queryByText("1. Compression — ON")).not.toBeInTheDocument();
   });
+
+  it("bascule vers le mode restauration et décode un fichier Excel", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          decode_id: "dec123",
+          filename: "bible_ancien_testament_1.doc",
+          size: 3971072,
+          sha256: "bc2be09301c347bf8519c87316e2906baf9931a4650977de837261ca4484393f",
+          sha256_original: "bc2be09301c347bf8519c87316e2906baf9931a4650977de837261ca4484393f",
+          sha256_matched: true,
+          fragment_count: 31100,
+          compression: true,
+          ecc: true,
+          download_url: "/api/decode/download?decode_id=dec123",
+        }),
+      }),
+    );
+
+    render(<HomePage />);
+    await user.click(screen.getByTestId("tab-decode"));
+    expect(screen.getByText("Importer un classeur ADN (.xlsx / .xls)")).toBeInTheDocument();
+
+    const input = screen.getByTestId("decode-file-input") as HTMLInputElement;
+    const xlsxFile = new File([new Uint8Array([80, 75, 3, 4])], "export_adn.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    await user.upload(input, xlsxFile);
+    expect(screen.getByTestId("decode-file-meta")).toHaveTextContent("export_adn.xlsx");
+
+    await user.click(screen.getByTestId("run-decode-button"));
+    await waitFor(() => expect(screen.getByTestId("decode-results")).toBeInTheDocument());
+    expect(screen.getByTestId("decode-results")).toHaveTextContent("bible_ancien_testament_1.doc");
+    expect(screen.getByTestId("decode-results")).toHaveTextContent("3.79 Mo");
+    expect(screen.getByTestId("decode-results")).toHaveTextContent("31 100");
+    expect(screen.getByTestId("download-restored-button")).toBeInTheDocument();
+  });
+
+  it("valide les bornes GC côté client", async () => {
+    const user = userEvent.setup();
+    render(<HomePage />);
+    const pdf = new File([new Uint8Array([37, 80, 68, 70, 45])], "doc.pdf", {
+      type: "application/pdf",
+    });
+    await user.upload(screen.getByTestId("file-input"), pdf);
+
+    const minInput = screen.getByLabelText("GC minimum");
+    const maxInput = screen.getByLabelText("GC maximum");
+    await user.clear(minInput);
+    await user.type(minInput, "70");
+    await user.clear(maxInput);
+    await user.type(maxInput, "50");
+
+    await user.click(screen.getByRole("button", { name: /Générer et valider/ }));
+    expect(screen.getByTestId("error")).toHaveTextContent("Le GC minimum ne peut pas être supérieur au GC maximum");
+  });
 });

@@ -1,10 +1,10 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { downloadXlsx, encodeFile } from "@/lib/api";
+import { decodeExcelFile, downloadRestoredFile, downloadXlsx, encodeFile } from "@/lib/api";
 import { API_BASE, DEFAULT_PARAMS, type EncodeParams } from "@/lib/constants";
 import { formatBytes, sha256File, validateClientFile } from "@/lib/fileValidation";
-import type { EncodeResponse } from "@/lib/types";
+import type { DecodeResponse, EncodeResponse } from "@/lib/types";
 
 export default function HomePage() {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -16,12 +16,27 @@ export default function HomePage() {
   const [error, setError] = useState<string>("");
   const [result, setResult] = useState<EncodeResponse | null>(null);
   const [showGuide, setShowGuide] = useState(false);
+  const [mode, setMode] = useState<"encode" | "decode">("encode");
+
+  // State for decoding inverse
+  const decodeInputRef = useRef<HTMLInputElement>(null);
+  const [decodeDragOver, setDecodeDragOver] = useState(false);
+  const [decodeFile, setDecodeFile] = useState<File | null>(null);
+  const [decodeBusy, setDecodeBusy] = useState(false);
+  const [decodeError, setDecodeError] = useState("");
+  const [decodeResult, setDecodeResult] = useState<DecodeResponse | null>(null);
 
   const fileLabel = useMemo(() => {
     if (!file) return null;
     const extension = file.name.split(".").pop()?.toUpperCase() || "";
     return { name: file.name, extension, size: formatBytes(file.size) };
   }, [file]);
+
+  const decodeFileLabel = useMemo(() => {
+    if (!decodeFile) return null;
+    const extension = decodeFile.name.split(".").pop()?.toUpperCase() || "";
+    return { name: decodeFile.name, extension, size: formatBytes(decodeFile.size) };
+  }, [decodeFile]);
 
   async function onFile(next: File | null) {
     setError("");
@@ -41,9 +56,60 @@ export default function HomePage() {
     }
   }
 
+  function onDecodeFileSelect(next: File | null) {
+    setDecodeError("");
+    setDecodeResult(null);
+    if (!next) {
+      setDecodeFile(null);
+      return;
+    }
+    const name = next.name.toLowerCase();
+    if (!name.endsWith(".xlsx") && !name.endsWith(".xls")) {
+      setDecodeFile(null);
+      setDecodeError("Format non supporté : veuillez sélectionner un fichier Excel (.xlsx ou .xls)");
+      return;
+    }
+    setDecodeFile(next);
+  }
+
+  async function onRunDecode() {
+    if (!decodeFile) {
+      setDecodeError("Veuillez importer un fichier Excel (.xlsx ou .xls)");
+      return;
+    }
+    setDecodeBusy(true);
+    setDecodeError("");
+    try {
+      const resp = await decodeExcelFile(decodeFile);
+      setDecodeResult(resp);
+    } catch (err) {
+      setDecodeResult(null);
+      setDecodeError(err instanceof Error ? err.message : "Décodage impossible");
+    } finally {
+      setDecodeBusy(false);
+    }
+  }
+
+  async function onDownloadRestored() {
+    if (!decodeResult) return;
+    try {
+      await downloadRestoredFile(decodeResult.decode_id, decodeResult.filename);
+    } catch (err) {
+      setDecodeError(err instanceof Error ? err.message : "Téléchargement impossible");
+    }
+  }
+
   async function onGenerate() {
     if (!file) {
       setError("Importer un document");
+      return;
+    }
+    if (params.gcMin > params.gcMax) {
+      setError("Le GC minimum ne peut pas être supérieur au GC maximum");
+      return;
+    }
+    if (params.homopolymerMax < 1 || params.homopolymerMax > 10) {
+      setError("L'homopolymère maximum doit être compris entre 1 et 10");
       return;
     }
     setBusy(true);
@@ -106,7 +172,28 @@ export default function HomePage() {
         <div className="badge">Stockage numérique expérimental</div>
       </header>
 
-      <section className="grid">
+      <div className="tab-bar">
+        <button
+          type="button"
+          className={`tab-btn ${mode === "encode" ? "active" : ""}`}
+          onClick={() => setMode("encode")}
+          data-testid="tab-encode"
+        >
+          🧬 Encodage (Document → ADN)
+        </button>
+        <button
+          type="button"
+          className={`tab-btn ${mode === "decode" ? "active" : ""}`}
+          onClick={() => setMode("decode")}
+          data-testid="tab-decode"
+        >
+          🔄 Restauration inverse (Excel ADN → Document)
+        </button>
+      </div>
+
+      {mode === "encode" && (
+        <>
+          <section className="grid">
         <div className="card">
           <h2>Importer un document</h2>
           <div
@@ -189,6 +276,7 @@ export default function HomePage() {
             <label className="field">
               GC minimum
               <input
+                aria-label="GC minimum"
                 type="number"
                 min={0}
                 max={100}
@@ -201,6 +289,7 @@ export default function HomePage() {
             <label className="field">
               GC maximum
               <input
+                aria-label="GC maximum"
                 type="number"
                 min={0}
                 max={100}
@@ -615,6 +704,127 @@ homopolymère ≤ 3`}
               ))}
             </tbody>
           </table>
+        </section>
+      )}
+        </>
+      )}
+
+      {mode === "decode" && (
+        <section className="decode-container">
+          <div className="card">
+            <h2>Importer un classeur ADN (.xlsx / .xls)</h2>
+            <p className="hint">
+              Sélectionnez un classeur Excel contenant une feuille <code>SEQUENCES</code> et <code>METADATA</code> pour restaurer le fichier d&apos;origine bit-à-bit.
+            </p>
+            <div
+              className={`dropzone${decodeDragOver ? " active" : ""}`}
+              onClick={() => decodeInputRef.current?.click()}
+              onDragOver={(event) => {
+                event.preventDefault();
+                setDecodeDragOver(true);
+              }}
+              onDragLeave={() => setDecodeDragOver(false)}
+              onDrop={(event) => {
+                event.preventDefault();
+                setDecodeDragOver(false);
+                void onDecodeFileSelect(event.dataTransfer.files[0] ?? null);
+              }}
+            >
+              <strong>Glisser-déposer le classeur Excel</strong>
+              <p className="hint">ou cliquer pour choisir un fichier</p>
+              <p className="hint">Formats acceptés : .xlsx, .xls</p>
+              <input
+                ref={decodeInputRef}
+                type="file"
+                accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                data-testid="decode-file-input"
+                onChange={(event) => void onDecodeFileSelect(event.target.files?.[0] ?? null)}
+              />
+            </div>
+            {decodeFileLabel && (
+              <div className="file-meta" data-testid="decode-file-meta">
+                <strong>{decodeFileLabel.name}</strong>
+                <div>Type : {decodeFileLabel.extension}</div>
+                <div>Taille : {decodeFileLabel.size}</div>
+              </div>
+            )}
+            <div style={{ marginTop: 20 }}>
+              <button
+                className="primary"
+                type="button"
+                disabled={decodeBusy || !decodeFile}
+                onClick={() => void onRunDecode()}
+                data-testid="run-decode-button"
+              >
+                Décoder et restaurer le document d&apos;origine
+              </button>
+              {decodeBusy && (
+                <p className="progress">Reconstruction et vérification bit-à-bit en cours…</p>
+              )}
+              {decodeError && (
+                <div className="error" data-testid="decode-error">
+                  {decodeError}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {decodeResult && (
+            <section className="card" data-testid="decode-results">
+              <h2>Document restauré avec succès</h2>
+              <div className="stats">
+                <div className="stat">
+                  <span>Fichier restauré</span>
+                  <strong style={{ fontSize: 16 }}>{decodeResult.filename}</strong>
+                </div>
+                <div className="stat">
+                  <span>Taille</span>
+                  <strong>{formatBytes(decodeResult.size)}</strong>
+                </div>
+                <div className="stat">
+                  <span>Fragments traités</span>
+                  <strong>{decodeResult.fragment_count.toLocaleString("fr-FR")}</strong>
+                </div>
+                <div className="stat">
+                  <span>Compression</span>
+                  <strong>{decodeResult.compression ? "ON (zlib)" : "OFF"}</strong>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 16 }}>
+                <p>
+                  <strong>SHA-256 reconstruit :</strong>{" "}
+                  <span className="hash" style={{ wordBreak: "break-all" }}>{decodeResult.sha256}</span>
+                </p>
+                {decodeResult.sha256_matched === true && (
+                  <div className="recon-badge pass">
+                    ✓ Fichier reconstruit bit-à-bit (SHA-256 conforme au document original)
+                  </div>
+                )}
+                {decodeResult.sha256_matched === false && (
+                  <div className="recon-badge warn">
+                    ⚠ Empreinte différente du hash original enregistré dans l&apos;Excel
+                  </div>
+                )}
+                {decodeResult.sha256_matched === null && (
+                  <div className="recon-badge pass">
+                    ✓ Document restauré avec succès (empreinte originale non consignée)
+                  </div>
+                )}
+              </div>
+
+              <div className="export-actions" style={{ marginTop: 24 }}>
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={() => void onDownloadRestored()}
+                  data-testid="download-restored-button"
+                >
+                  Télécharger le fichier restauré ({decodeResult.filename})
+                </button>
+              </div>
+            </section>
+          )}
         </section>
       )}
 

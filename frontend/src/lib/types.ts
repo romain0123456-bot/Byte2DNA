@@ -55,3 +55,17 @@ export type ApiError = {
   error?: string;
   detail?: string | { msg: string }[];
 };
+
+export type DecodeResponse = {
+  decode_id: string;
+  filename: string;
+  size: number;
+  sha256: string;
+  sha256_original: string | null;
+  sha256_matched: boolean | null;
+  fragment_count: number;
+  compression: boolean;
+  ecc: boolean;
+  download_url: string;
+};
+

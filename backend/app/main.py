@@ -21,10 +21,18 @@ from app.constants import (
     PROFILE_NAME,
     RESULT_CACHE_LIMIT,
 )
-from app.models import ApiEncodeResponse, EncodeConfig, EncodingResult, ExportRequest, RoundtripResult
+from app.models import (
+    ApiDecodeResponse,
+    ApiEncodeResponse,
+    EncodeConfig,
+    EncodingResult,
+    ExportRequest,
+    RoundtripResult,
+)
 from app.services.encoder import encode
 from app.services.exporter import build_xlsx, export_filename
 from app.services.files import UploadError, validate_upload
+from app.services.reconstructor import reconstruct_from_excel
 from app.services.validator import validate_roundtrip
 
 app = FastAPI(title=APPLICATION_NAME, version=ENCODING_VERSION)
@@ -48,6 +56,8 @@ _CACHE: OrderedDict[str, tuple[EncodingResult, RoundtripResult]] = OrderedDict()
 _LOCK = Lock()
 EXPORT_CACHE_DIR = Path(tempfile.gettempdir()) / "byte2dna_exports"
 EXPORT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+DECODE_CACHE_DIR = Path(tempfile.gettempdir()) / "byte2dna_decodes"
+DECODE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _store(result: EncodingResult, roundtrip: RoundtripResult) -> str:
@@ -130,13 +140,16 @@ async def encode_file(
             homopolymer_max=homopolymer_max,
         )
     except ValidationError as exc:
-        raise HTTPException(status_code=400, detail="Encoding failed") from exc
+        err_msg = exc.errors()[0]["msg"] if exc.errors() else "Encoding failed"
+        if err_msg.startswith("Value error, "):
+            err_msg = err_msg[len("Value error, ") :]
+        raise HTTPException(status_code=400, detail=err_msg) from exc
 
     try:
         result = encode(raw, config, filename=filename)
         roundtrip = validate_roundtrip(raw, result.fragments, result.decode_metadata)
     except ValueError as exc:
-        message = str(exc) if str(exc) in {"Encoding failed", "Empty file"} else "Encoding failed"
+        message = str(exc) if str(exc) else "Encoding failed"
         raise HTTPException(status_code=400, detail=message) from exc
     finally:
         raw = b""
@@ -241,3 +254,91 @@ def export_xlsx_get(request: Request, result_id: str) -> Response:
 @app.post("/api/export")
 def export_xlsx(body: ExportRequest) -> Response:
     return _build_export_response(body.result_id)
+
+
+@app.post("/api/decode", response_model=ApiDecodeResponse)
+async def decode_excel_file(
+    file: UploadFile = File(...),
+) -> ApiDecodeResponse:
+    raw = await file.read(50 * 1024 * 1024 + 1)
+    if len(raw) > 50 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Fichier Excel trop volumineux (max 50 Mo)")
+    if not raw:
+        raise HTTPException(status_code=400, detail="Fichier vide")
+
+    filename = file.filename or "export.xlsx"
+    ext = Path(filename).suffix.lower()
+    if ext not in {".xlsx", ".xls"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Format non supporté : veuillez importer un classeur .xlsx ou .xls contenant des séquences ADN",
+        )
+
+    try:
+        recon = reconstruct_from_excel(raw, filename=filename)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc) or "Décodage impossible") from exc
+
+    decode_id = uuid4().hex
+    file_path = DECODE_CACHE_DIR / f"{decode_id}.bin"
+    meta_path = DECODE_CACHE_DIR / f"{decode_id}.json"
+
+    file_path.write_bytes(recon.reconstructed_bytes)
+    meta_path.write_text(
+        json.dumps({
+            "filename": recon.filename,
+            "size": recon.size,
+            "sha256": recon.sha256,
+            "sha256_original": recon.sha256_original,
+            "sha256_matched": recon.sha256_matched,
+            "fragment_count": recon.fragment_count,
+            "compression": recon.compression,
+            "ecc": recon.ecc,
+        }),
+        encoding="utf-8",
+    )
+
+    return ApiDecodeResponse(
+        decode_id=decode_id,
+        filename=recon.filename,
+        size=recon.size,
+        sha256=recon.sha256,
+        sha256_original=recon.sha256_original,
+        sha256_matched=recon.sha256_matched,
+        fragment_count=recon.fragment_count,
+        compression=recon.compression,
+        ecc=recon.ecc,
+        download_url=f"/api/decode/download?decode_id={decode_id}",
+    )
+
+
+@app.get("/api/decode/download")
+def download_decoded_file(decode_id: str) -> Response:
+    file_path = DECODE_CACHE_DIR / f"{decode_id}.bin"
+    meta_path = DECODE_CACHE_DIR / f"{decode_id}.json"
+
+    if not file_path.is_file() or not meta_path.is_file():
+        raise HTTPException(status_code=404, detail="Fichier restauré introuvable ou expiré")
+
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    filename = meta.get("filename") or "reconstructed_document.doc"
+    payload = file_path.read_bytes()
+
+    ext = Path(filename).suffix.lower()
+    media_types = {
+        ".doc": "application/msword",
+        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".pdf": "application/pdf",
+    }
+    media_type = media_types.get(ext, "application/octet-stream")
+
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "Access-Control-Expose-Headers": "Content-Disposition",
+        "Content-Length": str(len(payload)),
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+    }
+    return Response(content=payload, media_type=media_type, headers=headers)
+

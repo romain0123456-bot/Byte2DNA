@@ -1,6 +1,6 @@
 import { API_BASE } from "./constants";
 import type { EncodeParams } from "./constants";
-import type { ApiError, EncodeResponse } from "./types";
+import type { ApiError, DecodeResponse, EncodeResponse } from "./types";
 
 function errorMessage(payload: ApiError | string, fallback: string): string {
   if (typeof payload === "string" && payload.trim()) return payload;
@@ -80,3 +80,56 @@ export async function downloadXlsx(resultId: string, suggestedName: string): Pro
     window.URL.revokeObjectURL(url);
   }, 2000);
 }
+
+export async function decodeExcelFile(file: File): Promise<DecodeResponse> {
+  const body = new FormData();
+  body.append("file", file);
+
+  const response = await fetch(`${API_BASE}/api/decode`, {
+    method: "POST",
+    body,
+  });
+  const payload = (await response.json().catch(() => ({}))) as ApiError;
+  if (!response.ok) {
+    throw new Error(errorMessage(payload, "Décodage impossible"));
+  }
+  return payload as unknown as DecodeResponse;
+}
+
+export async function downloadRestoredFile(
+  decodeId: string,
+  suggestedName: string,
+): Promise<void> {
+  const url = `${API_BASE}/api/decode/download?decode_id=${encodeURIComponent(decodeId)}`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as ApiError;
+    throw new Error(errorMessage(payload, "Téléchargement impossible"));
+  }
+
+  const blob = await response.blob();
+  const header = response.headers.get("content-disposition");
+  const match = header?.match(/filename="?([^";]+)"?/);
+  const filename = match?.[1]?.replace(/['"]/g, "").trim() || suggestedName;
+
+  const blobUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.style.position = "fixed";
+  link.style.left = "-9999px";
+  link.style.top = "-9999px";
+  link.style.opacity = "0";
+  link.href = blobUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+
+  setTimeout(() => {
+    try {
+      document.body.removeChild(link);
+    } catch {
+      // ignore
+    }
+    window.URL.revokeObjectURL(blobUrl);
+  }, 2000);
+}
+

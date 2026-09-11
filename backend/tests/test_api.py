@@ -128,3 +128,44 @@ def test_export_survives_in_memory_cache_clear() -> None:
     wb = load_workbook(BytesIO(response.content))
     assert set(wb.sheetnames) == {"SEQUENCES", "METADATA", "QC", "DECODING"}
 
+
+def test_api_decode_roundtrip_doc() -> None:
+    doc_content = tiny_doc_bytes(b"doc-to-dna-and-back")
+    encoded = _encode("bible_sample.doc", doc_content).json()
+    result_id = encoded["result_id"]
+
+    export_resp = client.get(f"/api/export?result_id={result_id}")
+    assert export_resp.status_code == 200
+
+    # Upload the exported XLSX to /api/decode
+    files = {"file": ("exported.xlsx", export_resp.content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    decode_resp = client.post("/api/decode", files=files)
+    assert decode_resp.status_code == 200, decode_resp.text
+    data = decode_resp.json()
+    assert data["filename"] == "bible_sample.doc"
+    assert data["size"] == len(doc_content)
+    assert data["sha256_matched"] is True
+    assert data["fragment_count"] == encoded["stats"]["fragment_count"]
+
+    # Download restored file
+    decode_id = data["decode_id"]
+    dl_resp = client.get(f"/api/decode/download?decode_id={decode_id}")
+    assert dl_resp.status_code == 200
+    assert dl_resp.content == doc_content
+    assert dl_resp.headers["content-type"] == "application/msword"
+
+
+def test_api_decode_invalid_files() -> None:
+    # Unsupported extension
+    resp = client.post("/api/decode", files={"file": ("bad.txt", b"plain text", "text/plain")})
+    assert resp.status_code == 400
+
+    # Corrupted xlsx
+    resp2 = client.post("/api/decode", files={"file": ("bad.xlsx", b"not a zip", "application/octet-stream")})
+    assert resp2.status_code == 400
+
+    # Missing decode download
+    resp3 = client.get("/api/decode/download?decode_id=nonexistent")
+    assert resp3.status_code == 404
+
+

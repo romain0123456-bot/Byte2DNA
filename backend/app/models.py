@@ -151,3 +151,17 @@ class ExportRequest(BaseModel):
 class ErrorBody(BaseModel):
     error: str
     detail: str
+
+
+class ApiDecodeResponse(BaseModel):
+    decode_id: str
+    filename: str
+    size: int
+    sha256: str
+    sha256_original: str | None = None
+    sha256_matched: bool | None = None
+    fragment_count: int
+    compression: bool
+    ecc: bool
+    download_url: str
+
