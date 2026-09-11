@@ -85,10 +85,34 @@ export async function decodeExcelFile(file: File): Promise<DecodeResponse> {
   const body = new FormData();
   body.append("file", file);
 
-  const response = await fetch(`${API_BASE}/api/decode`, {
-    method: "POST",
-    body,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}/api/decode`, {
+      method: "POST",
+      body,
+    });
+  } catch {
+    // If Next.js rewrite has a network error or socket timeout, fallback to direct backend
+    response = await fetch("http://127.0.0.1:8001/api/decode", {
+      method: "POST",
+      body,
+    });
+  }
+
+  if (!response.ok && response.status >= 500) {
+    try {
+      const fallback = await fetch("http://127.0.0.1:8001/api/decode", {
+        method: "POST",
+        body,
+      });
+      if (fallback.ok) {
+        response = fallback;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   const payload = (await response.json().catch(() => ({}))) as ApiError;
   if (!response.ok) {
     throw new Error(errorMessage(payload, "Décodage impossible"));
@@ -100,11 +124,15 @@ export async function downloadRestoredFile(
   decodeId: string,
   suggestedName: string,
 ): Promise<void> {
-  const url = `${API_BASE}/api/decode/download?decode_id=${encodeURIComponent(decodeId)}`;
-  const response = await fetch(url);
+  let response = await fetch(`${API_BASE}/api/decode/download?decode_id=${encodeURIComponent(decodeId)}`);
   if (!response.ok) {
-    const payload = (await response.json().catch(() => ({}))) as ApiError;
-    throw new Error(errorMessage(payload, "Téléchargement impossible"));
+    const directResp = await fetch(`http://127.0.0.1:8001/api/decode/download?decode_id=${encodeURIComponent(decodeId)}`).catch(() => null);
+    if (directResp && directResp.ok) {
+      response = directResp;
+    } else {
+      const payload = (await response.json().catch(() => ({}))) as ApiError;
+      throw new Error(errorMessage(payload, "Téléchargement impossible"));
+    }
   }
 
   const blob = await response.blob();
