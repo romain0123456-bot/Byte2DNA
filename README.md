@@ -77,7 +77,7 @@ Pour utiliser un autre port backend (ex. 8010) : lancer `uvicorn ... --port 8010
 ### Diagnostic : backend indisponible
 
 1. `curl http://127.0.0.1:8001/health` doit renvoyer `{"status":"ok"}` (HTTP 200). Sinon, le backend n’est pas lancé ou a échoué : relire la sortie d’`uvicorn`.
-2. Réponse différente de `{"status":"ok"}` : **un autre service occupe peut-être le port 8001** (constaté lors de la vérification de ce README). Vérifier avec `lsof -nP -iTCP:8001 -sTCP:LISTEN` (macOS/Linux) ou `netstat -ano | findstr :8001` (Windows), l’arrêter, ou utiliser un autre port (voir ci-dessus).
+2. Réponse différente de `{"status":"ok"}` : **un autre service occupe peut-être le port 8001**. Vérifier avec `lsof -nP -iTCP:8001 -sTCP:LISTEN` (macOS/Linux) ou `netstat -ano | findstr :8001` (Windows), l’arrêter, ou utiliser un autre port (voir ci-dessus).
 3. `pip install` échoue sur `pydantic-core` : vous n’êtes pas en Python 3.12.
 4. Health OK mais l’UI affiche une erreur : vérifier que `API_PROXY_TARGET` pointe vers le bon port, puis redémarrer `npm run dev`.
 
