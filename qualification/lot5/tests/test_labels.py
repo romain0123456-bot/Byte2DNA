@@ -23,5 +23,5 @@ class NormalizeLabelTests(unittest.TestCase):
         self.assertEqual(normalize_label("Alpha\u2003Beta\u00a0Gamma"), "alpha-beta-gamma")
 
     def test_controlled_ci_failure(self):
-        # Intentional first-HEAD qualification failure; retain until native review.
-        self.assertEqual(normalize_label("Controlled CI"), "deliberately-wrong-oracle")
+        # Corrected after Reviewer-Claude observed the intentional red CI (CI-RED-01).
+        self.assertEqual(normalize_label("Controlled CI"), "controlled-ci")
