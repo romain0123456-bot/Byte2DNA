@@ -33,19 +33,36 @@ Le codec Python est indépendant du serveur :
 from app.services.codec import encode, decode
 ```
 
-## Installation backend
+## Démarrage rapide
+
+### Prérequis
+
+- Python **3.12** (3.14 échoue à compiler `pydantic-core` avec les versions épinglées) ;
+- Node.js 22 et npm (versions utilisées pour la vérification) ;
+- ports libres : **8001** (backend FastAPI) et **3000** (frontend Next.js).
+
+### Ports
+
+| Service | Port | Remarque |
+|---|---|---|
+| Backend FastAPI | 8001 | port attendu par le proxy du frontend (`frontend/next.config.ts`) et par `frontend/src/lib/api.ts` |
+| Frontend Next.js | 3000 | `npm run dev` |
+
+Le navigateur appelle `/backend/*` ; Next.js proxyfie vers `API_PROXY_TARGET` (défaut `http://127.0.0.1:8001`).
+
+### 1. Backend (terminal 1)
 
 ```bash
 cd backend
-python -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8001
 ```
 
-Santé : [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health) → `{"status":"ok"}`
+Vérifier : `curl http://127.0.0.1:8001/health` → `{"status":"ok"}`.
 
-## Installation frontend
+### 2. Frontend (terminal 2)
 
 ```bash
 cd frontend
@@ -53,7 +70,16 @@ npm install
 npm run dev
 ```
 
-Ouvrir [http://127.0.0.1:3000](http://127.0.0.1:3000). Le frontend proxyfie `/backend/*` vers FastAPI (`API_PROXY_TARGET`, défaut `http://127.0.0.1:8000`).
+Ouvrir [http://127.0.0.1:3000](http://127.0.0.1:3000).
+
+Pour utiliser un autre port backend (ex. 8010) : lancer `uvicorn ... --port 8010` et `API_PROXY_TARGET=http://127.0.0.1:8010 npm run dev`. Limite connue : le décodage (`/api/decode`) garde un repli direct codé en dur sur `127.0.0.1:8001` dans `frontend/src/lib/api.ts`.
+
+### Diagnostic : backend indisponible
+
+1. `curl http://127.0.0.1:8001/health` doit renvoyer `{"status":"ok"}` (HTTP 200). Sinon, le backend n’est pas lancé ou a échoué : relire la sortie d’`uvicorn`.
+2. Réponse JSON différente (ex. champs `engine`, `jobs`, `tools`) : **un autre service occupe le port 8001**. Vérifier avec `lsof -nP -iTCP:8001 -sTCP:LISTEN`, l’arrêter, ou utiliser un autre port (voir ci-dessus).
+3. `pip install` échoue sur `pydantic-core` : vous n’êtes pas en Python 3.12.
+4. Health OK mais l’UI affiche une erreur : vérifier que `API_PROXY_TARGET` pointe vers le bon port, puis redémarrer `npm run dev`.
 
 ## Utilisation
 
@@ -68,12 +94,14 @@ L’export est **interdit** si le round-trip échoue. S’il passe mais que des 
 
 ## Tests
 
-Backend :
+Backend (depuis le venv activé) :
 
 ```bash
 cd backend
 python -m pytest
 ```
+
+Résultat constaté (Python 3.12, 2026-10-15) : `111 passed`.
 
 Frontend :
 
@@ -83,6 +111,8 @@ npm test
 npm run typecheck
 npm run build
 ```
+
+Résultat constaté (Node 22) : `npm test` 15 tests passés, `typecheck` et `build` sans erreur.
 
 ## Format BYTE2DNA-POC-1
 
