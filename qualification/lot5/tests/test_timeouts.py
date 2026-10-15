@@ -20,3 +20,15 @@ class ParseTimeoutTests(unittest.TestCase):
         for value in (None, "5", 1.5, [], b"5"):
             with self.subTest(value=value), self.assertRaises(TypeError):
                 parse_timeout(value)
+
+    def test_bool_rejected(self):
+        for value in (True, False):
+            with self.subTest(value=value), self.assertRaises(TypeError):
+                parse_timeout(value)
+
+    def test_int_subclass_rejected(self):
+        class MyInt(int):
+            pass
+
+        with self.assertRaises(TypeError):
+            parse_timeout(MyInt(5))
