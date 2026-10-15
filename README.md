@@ -72,12 +72,12 @@ npm run dev
 
 Ouvrir [http://127.0.0.1:3000](http://127.0.0.1:3000).
 
-Pour utiliser un autre port backend (ex. 8010) : lancer `uvicorn ... --port 8010` et `API_PROXY_TARGET=http://127.0.0.1:8010 npm run dev`. Limite connue : le décodage (`/api/decode`) garde un repli direct codé en dur sur `127.0.0.1:8001` dans `frontend/src/lib/api.ts`.
+Pour utiliser un autre port backend (ex. 8010) : lancer `uvicorn ... --port 8010` et `API_PROXY_TARGET=http://127.0.0.1:8010 npm run dev`. Limite connue : `/api/decode` et `/api/decode/download` (téléchargement du fichier restauré) gardent un repli direct codé en dur sur `127.0.0.1:8001` dans `frontend/src/lib/api.ts` (lignes 96, 104, 129) ; `API_PROXY_TARGET` ne les couvre pas.
 
 ### Diagnostic : backend indisponible
 
 1. `curl http://127.0.0.1:8001/health` doit renvoyer `{"status":"ok"}` (HTTP 200). Sinon, le backend n’est pas lancé ou a échoué : relire la sortie d’`uvicorn`.
-2. Réponse JSON différente (ex. champs `engine`, `jobs`, `tools`) : **un autre service occupe le port 8001**. Vérifier avec `lsof -nP -iTCP:8001 -sTCP:LISTEN`, l’arrêter, ou utiliser un autre port (voir ci-dessus).
+2. Réponse différente de `{"status":"ok"}` : **un autre service occupe peut-être le port 8001** (constaté lors de la vérification de ce README). Vérifier avec `lsof -nP -iTCP:8001 -sTCP:LISTEN` (macOS/Linux) ou `netstat -ano | findstr :8001` (Windows), l’arrêter, ou utiliser un autre port (voir ci-dessus).
 3. `pip install` échoue sur `pydantic-core` : vous n’êtes pas en Python 3.12.
 4. Health OK mais l’UI affiche une erreur : vérifier que `API_PROXY_TARGET` pointe vers le bon port, puis redémarrer `npm run dev`.
 
