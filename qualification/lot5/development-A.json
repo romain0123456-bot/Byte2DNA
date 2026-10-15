@@ -1,0 +1,14 @@
+{
+  "source_issue": "SPI-406",
+  "developer_agent_id": "131d7955-e151-476f-8e89-6623f2b5a70d",
+  "run_id": "03ccad47-86a0-48fb-bc34-a60bcbacbe37",
+  "model_family": "GPT / gpt-6.1-sol",
+  "github_author": "romain0123456-bot",
+  "base": "main",
+  "base_sha": "8fbf6ff508ee02de44c46c03b2698182918a5e35",
+  "branch": "SPI-406-lot5-byte2dna-a-labels-ci-rouge-contr-l-e-puis-livraison",
+  "phase": "CI-RED-01 correction requested by native Reviewer-Claude after red CI observation; independent verification pending",
+  "head_and_pr": "Recorded in native lot5-development after push to avoid self-referential commit hash.",
+  "reviewer_red_head": "a45c1f9c8a98dde4ec8a294c3e3567cad811ac8f",
+  "reviewer_run_id": "a71a708e-6fa2-444d-9774-38db9cb40b54"
+}
