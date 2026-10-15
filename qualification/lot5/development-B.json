@@ -1,0 +1,13 @@
+{
+  "source_issue": "SPI-407",
+  "developer_agent_id": "42867081-5a4e-4a91-b897-61b28f840a8e",
+  "run_id": "0adffb7e-cad7-48dd-af60-f35f7f7fe74c",
+  "model_family": "Claude / claude-sonnet-5-5",
+  "github_author": "romain0123456-bot",
+  "base": "main",
+  "branch": "SPI-407-lot5-byte2dna-b-timeouts-p1-contr-l-puis-livraison",
+  "pr": 3,
+  "phase": "Correction of controlled P1 B-P1-01 (bool accepted by isinstance) requested by native Reviewer-Codex run 56283ddf; independent verification pending",
+  "initial_head": "0272ab4ad4b91575c419448f682f8c101149f82b",
+  "head_and_pr": "Recorded in native lot5-development after push to avoid self-referential commit hash."
+}
