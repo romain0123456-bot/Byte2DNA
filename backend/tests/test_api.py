@@ -169,8 +169,6 @@ def test_api_decode_invalid_files() -> None:
     assert resp3.status_code == 404
 
 
-
-
 def test_invalid_encode_config_returns_400_detail_only() -> None:
     resp = _encode("cfg.pdf", tiny_pdf_bytes(), fragment_length=123)
     assert resp.status_code == 400

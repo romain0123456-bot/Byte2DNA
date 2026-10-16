@@ -101,7 +101,7 @@ cd backend
 python -m pytest
 ```
 
-Résultat constaté (Python 3.12, 2026-10-15) : `111 passed`.
+Les comptes de tests évoluent : voir [docs/QUALIFICATION.md](docs/QUALIFICATION.md) pour les résultats constatés et datés.
 
 Frontend :
 
@@ -112,7 +112,7 @@ npm run typecheck
 npm run build
 ```
 
-Résultat constaté (Node 22) : `npm test` 15 tests passés, `typecheck` et `build` sans erreur.
+Résultats constatés et datés : voir [docs/QUALIFICATION.md](docs/QUALIFICATION.md).
 
 ## Format BYTE2DNA-POC-1
 
