@@ -169,3 +169,44 @@ def test_api_decode_invalid_files() -> None:
     assert resp3.status_code == 404
 
 
+
+
+def test_invalid_encode_config_returns_400_detail_only() -> None:
+    resp = _encode("cfg.pdf", tiny_pdf_bytes(), fragment_length=123)
+    assert resp.status_code == 400
+    assert resp.json() == {"detail": "fragment_length must be one of (100, 150, 200)"}
+
+    resp = _encode("cfg.pdf", tiny_pdf_bytes(), gc_min=70, gc_max=60)
+    assert resp.status_code == 400
+    assert resp.json() == {"detail": "gc_max must be greater than or equal to gc_min"}
+
+
+def test_encode_without_file_returns_422() -> None:
+    resp = client.post("/api/encode")
+    assert resp.status_code == 422
+    assert resp.json()["detail"][0]["loc"] == ["body", "file"]
+
+
+def test_roundtrip_fail_disables_export(monkeypatch) -> None:
+    from app import main
+    from app.models import RoundtripResult
+
+    def _fail(original: bytes, fragments, metadata) -> RoundtripResult:
+        return RoundtripResult(
+            result="FAIL",
+            sha256_original="0" * 64,
+            message="Round-trip failed",
+        )
+
+    monkeypatch.setattr(main, "validate_roundtrip", _fail)
+    resp = _encode("rt.pdf", tiny_pdf_bytes(b"rt-fail"))
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["roundtrip"]["result"] == "FAIL"
+    assert body["export_allowed"] is False
+    assert body["export_warning"] == "EXPORT DISABLED"
+
+    export = client.post("/api/export", json={"result_id": body["result_id"]})
+    assert export.status_code == 400
+    assert export.json() == {"detail": "Export disabled: round-trip failed"}
+    assert "/" not in export.text and "Traceback" not in export.text

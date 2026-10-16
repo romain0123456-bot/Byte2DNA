@@ -81,9 +81,13 @@ L’UI distingue le succès d’encodage (`ENCODING VALID`) du respect des contr
 
 ## API
 
+Référence complète et à jour des routes et des erreurs : [`docs/API.md`](API.md). Résumé :
+
 `POST /api/encode` (multipart) : fichier + paramètres → JSON (stats, aperçu, round-trip, `result_id`).
 
 `POST /api/export` : `{ "result_id": "..." }` → XLSX si et seulement si `ROUND-TRIP == PASS`.
+
+`POST /api/decode` (XLSX → fichier reconstruit) et `GET /api/decode/download` : voir `docs/API.md`.
 
 `GET /health` → `{"status":"ok"}`.
 
