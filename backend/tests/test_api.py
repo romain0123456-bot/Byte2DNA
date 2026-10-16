@@ -210,3 +210,27 @@ def test_roundtrip_fail_disables_export(monkeypatch) -> None:
     assert export.status_code == 400
     assert export.json() == {"detail": "Export disabled: round-trip failed"}
     assert "/" not in export.text and "Traceback" not in export.text
+
+
+def test_path_traversal_ids_are_rejected(tmp_path) -> None:
+    from app.main import DECODE_CACHE_DIR, EXPORT_CACHE_DIR
+
+    outside = EXPORT_CACHE_DIR.parent / "b2d_traversal_probe"
+    paths = [
+        outside.with_suffix(".xlsx"),
+        DECODE_CACHE_DIR.parent / "b2d_traversal_probe.bin",
+        DECODE_CACHE_DIR.parent / "b2d_traversal_probe.json",
+    ]
+    try:
+        paths[0].write_bytes(b"outside-xlsx")
+        paths[1].write_bytes(b"outside-bin")
+        paths[2].write_text('{"filename": "x.pdf"}', encoding="utf-8")
+        for bad in ("../b2d_traversal_probe", str(outside), "..%2Fb2d_traversal_probe", "x" * 8):
+            assert client.get("/api/export", params={"result_id": bad}).status_code == 404
+            assert client.post("/api/export", json={"result_id": bad}).status_code == 404
+        dec = client.get("/api/decode/download", params={"decode_id": "../b2d_traversal_probe"})
+        assert dec.status_code == 404
+        assert b"outside" not in dec.content
+    finally:
+        for p in paths:
+            p.unlink(missing_ok=True)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import tempfile
 from collections import OrderedDict
 from pathlib import Path
@@ -58,6 +59,9 @@ EXPORT_CACHE_DIR = Path(tempfile.gettempdir()) / "byte2dna_exports"
 EXPORT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 DECODE_CACHE_DIR = Path(tempfile.gettempdir()) / "byte2dna_decodes"
 DECODE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+
+_ID_RE = re.compile(r"[0-9a-f]{32}")  # ids are always uuid4().hex
 
 
 def _store(result: EncodingResult, roundtrip: RoundtripResult) -> str:
@@ -191,6 +195,8 @@ async def encode_file(
 
 
 def _build_export_response(result_id: str, is_head: bool = False) -> Response:
+    if not _ID_RE.fullmatch(result_id):
+        raise HTTPException(status_code=404, detail="Export failed")
     file_path = EXPORT_CACHE_DIR / f"{result_id}.xlsx"
     meta_path = EXPORT_CACHE_DIR / f"{result_id}.json"
 
@@ -314,6 +320,8 @@ async def decode_excel_file(
 
 @app.get("/api/decode/download")
 def download_decoded_file(decode_id: str) -> Response:
+    if not _ID_RE.fullmatch(decode_id):
+        raise HTTPException(status_code=404, detail="Fichier restauré introuvable ou expiré")
     file_path = DECODE_CACHE_DIR / f"{decode_id}.bin"
     meta_path = DECODE_CACHE_DIR / f"{decode_id}.json"
 

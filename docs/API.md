@@ -98,11 +98,14 @@ Trois formes de corps existent. Elles ne sont pas unifiées dans le code.
 | Export d'un résultat en échec round-trip | export | 400 | `{"detail":"Export disabled: round-trip failed"}` | `main.py:211-213` ; même test |
 | `result_id` inconnu ou expiré (hors cache mémoire et disque) | export | 404 | `{"detail":"Export failed"}` | `main.py:95` ; `test_api.py:87-88` |
 | `result_id` < 8 caractères (POST) | export | 422 | validation pydantic | `models.py:147-148` |
+| Champ de formulaire non numérique (`fragment_length`, `homopolymer_max`, `gc_min`, `gc_max`) | encode | 422 | corps de validation FastAPI (ex. `int_parsing`) | observé par sondage Sprint 3 |
+| `result_id` absent (GET) ou `file` / `decode_id` absent | export, decode, download | 422 | corps de validation FastAPI | observé par sondage Sprint 3 |
+| `result_id` / `decode_id` qui n'est pas 32 caractères hexadécimaux minuscules (ex. `../x`) | export, download | 404 | mêmes corps que pour un identifiant inconnu | `main.py` `_ID_RE` ; `test_api.py::test_path_traversal_ids_are_rejected` |
 | Génération XLSX en erreur | export | 500 | `{"detail":"Export failed"}` | `main.py:214-217` (non testé) |
 | Fichier vide | decode | 400 | `{"detail":"Fichier vide"}` | `main.py:266-267` |
 | Extension hors `.xlsx/.xls` | decode | 400 | `{"detail":"Format non supporté : veuillez importer un classeur .xlsx ou .xls contenant des séquences ADN"}` | `main.py:269-275` ; `test_api.py::test_api_decode_invalid_files` |
 | Fichier > 50 Mo | decode | 400 | `{"detail":"Fichier Excel trop volumineux (max 50 Mo)"}` | `main.py:264-265` |
-| XLSX illisible | decode | 400 | `{"detail":"Invalid XLSX file"}` | `excel_reader.py:49`, `main.py:277-280` ; `test_api.py::test_api_decode_invalid_files` |
+| XLSX illisible (`.xls` illisible : `{"detail":"Invalid XLS file"}`) | decode | 400 | `{"detail":"Invalid XLSX file"}` | `excel_reader.py:49`, `main.py:277-280` ; `test_api.py::test_api_decode_invalid_files` |
 | Reconstruction impossible | decode | 400 | `{"detail":"Decoding failed: could not reconstruct file from DNA sequences"}` | `reconstructor.py:35-37` |
 | `decode_id` inconnu ou expiré | download | 404 | `{"detail":"Fichier restauré introuvable ou expiré"}` | `main.py:320-321` ; `test_api.py::test_api_decode_invalid_files` |
 
