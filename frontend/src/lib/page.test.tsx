@@ -142,6 +142,52 @@ describe("Byte2DNA page", () => {
     expect(screen.getByTestId("export-button")).toBeDisabled();
   });
 
+  it("FAIL : message explicite, export bloqué, pas de lien direct, annonce accessible", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          ...passResponse,
+          roundtrip: { ...passResponse.roundtrip, result: "FAIL", bit_identical: false },
+          export_allowed: false,
+          export_warning: null,
+        }),
+      }),
+    );
+    render(<HomePage />);
+    await user.upload(
+      screen.getByTestId("file-input") as HTMLInputElement,
+      new File([new Uint8Array([80, 75, 3, 4])], "notes.docx", {
+        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: /Générer et valider/ }));
+    const rt = await screen.findByTestId("roundtrip");
+    expect(rt).toHaveAttribute("role", "status");
+    expect(rt).toHaveTextContent("✗ échec");
+    expect(rt).toHaveTextContent("le téléchargement XLSX est bloqué");
+    expect(screen.getByTestId("export-button")).toBeDisabled();
+    expect(screen.queryByText(/Téléchargement direct/)).toBeNull();
+  });
+
+  it("erreur réseau : message clair dans une région role=alert", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+    render(<HomePage />);
+    await user.upload(
+      screen.getByTestId("file-input") as HTMLInputElement,
+      new File([new Uint8Array([80, 75, 3, 4])], "notes.docx", {
+        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: /Générer et valider/ }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Impossible de joindre le serveur");
+    expect(alert).not.toHaveTextContent("Failed to fetch");
+  });
+
   it("réinitialise les paramètres", async () => {
     const user = userEvent.setup();
     render(<HomePage />);

@@ -333,9 +333,10 @@ export default function HomePage() {
         >
           Générer et valider les séquences ADN
         </button>
-        {busy && <p className="progress">Encodage et validation du round-trip en cours…</p>}
+        {busy && <p className="progress" role="status" aria-live="polite">Encodage et validation du round-trip en cours… Le bouton est désactivé jusqu'à la fin.</p>}
         {error && (
-          <div className="error" data-testid="error">
+          <div className="error" data-testid="error" role="alert">
+            <strong>Erreur : </strong>
             {error}
           </div>
         )}
@@ -634,10 +635,11 @@ homopolymère ≤ 3`}
             {result.stats.compression ? "" : " (désactivée)"}
           </p>
 
-          <div className={`roundtrip ${roundtripPass ? "pass" : "fail"}`} data-testid="roundtrip">
+          <div className={`roundtrip ${roundtripPass ? "pass" : "fail"}`} data-testid="roundtrip" role="status" aria-live="polite">
             <h3>ROUND-TRIP VALIDATION</h3>
             <p>
-              <strong>ROUND-TRIP : {result.roundtrip.result}</strong>
+              <strong>ROUND-TRIP : {result.roundtrip.result}</strong>{" "}
+              <span>{roundtripPass ? "(✓ validé)" : "(✗ échec)"}</span>
             </p>
             {roundtripPass ? (
               <>
@@ -646,14 +648,14 @@ homopolymère ≤ 3`}
               </>
             ) : (
               <>
-                <p>Reconstruction incorrecte.</p>
-                <p>EXPORT DISABLED</p>
+                <p>Reconstruction incorrecte : le fichier reconstruit diffère de l&apos;original.</p>
+                <p>EXPORT DISABLED : le téléchargement XLSX est bloqué car le round-trip a échoué.</p>
               </>
             )}
           </div>
 
           {result.export_warning && (
-            <div className="warning-banner">{result.export_warning}</div>
+            <div className="warning-banner" role="note"><strong>Attention : </strong>{result.export_warning}</div>
           )}
 
           <div className="export-actions">
@@ -698,7 +700,10 @@ homopolymère ≤ 3`}
                   <td className="num">{fragment.gc_percent.toFixed(1)} %</td>
                   <td className="num">{fragment.max_homopolymer}</td>
                   <td>
-                    <span className={`pill ${fragment.status}`}>{fragment.status}</span>
+                    <span className={`pill ${fragment.status}`}>
+                      {fragment.status === "VALID" ? "✓ " : fragment.status === "WARNING" ? "⚠ " : "✗ "}
+                      {fragment.status}
+                    </span>
                   </td>
                 </tr>
               ))}
@@ -759,10 +764,11 @@ homopolymère ≤ 3`}
                 Décoder et restaurer le document d&apos;origine
               </button>
               {decodeBusy && (
-                <p className="progress">Reconstruction et vérification bit-à-bit en cours…</p>
+                <p className="progress" role="status" aria-live="polite">Reconstruction et vérification bit-à-bit en cours…</p>
               )}
               {decodeError && (
-                <div className="error" data-testid="decode-error">
+                <div className="error" data-testid="decode-error" role="alert">
+                  <strong>Erreur : </strong>
                   {decodeError}
                 </div>
               )}
