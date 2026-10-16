@@ -2,6 +2,16 @@ import { API_BASE } from "./constants";
 import type { EncodeParams } from "./constants";
 import type { ApiError, DecodeResponse, EncodeResponse } from "./types";
 
+async function safeFetch(input: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, init);
+  } catch {
+    throw new Error(
+      "Impossible de joindre le serveur Byte2DNA. Vérifiez votre connexion et que l'API est démarrée, puis réessayez.",
+    );
+  }
+}
+
 function errorMessage(payload: ApiError | string, fallback: string): string {
   if (typeof payload === "string" && payload.trim()) return payload;
   if (typeof payload === "object" && payload) {
@@ -25,7 +35,7 @@ export async function encodeFile(
   body.append("gc_max", String(params.gcMax));
   body.append("homopolymer_max", String(params.homopolymerMax));
 
-  const response = await fetch(`${API_BASE}/api/encode`, {
+  const response = await safeFetch(`${API_BASE}/api/encode`, {
     method: "POST",
     body,
   });
