@@ -38,9 +38,44 @@ class GateContract(unittest.TestCase):
 
     def test_blocking_findings_refuse(self):
         for severity in ('p0', 'p1'):
-            reviews = [dict(self.reviews[0], **{severity: 1}), self.reviews[1]]
-            self.assertFalse(self.gate(reviews=reviews)['allowed'])
+            reviews = self.reviews + [dict(self.reviews[0], session='blocking', **{severity: 1})]
+            result = self.gate(reviews=reviews)
+            self.assertFalse(result['allowed'])
+            self.assertIn('blocking_findings', result['reasons'])
 
     def test_draft_or_missing_authorization_and_protections_refuse(self):
         for policy in ({'draft': True}, {'authorized': False}, {'protections': False}):
             self.assertFalse(self.gate(**policy)['allowed'])
+
+    def test_platform_values_require_exact_booleans(self):
+        for policy in ({'draft': None}, {'draft': 0}, {'authorized': 'false'},
+                       {'protections': 'false'}, {'mergeable': False}):
+            result = self.gate(**policy)
+            self.assertFalse(result['allowed'])
+            self.assertIn('repository_or_platform_gate', result['reasons'])
+
+    def test_malformed_evidence_refuses_without_exception(self):
+        for session in ([], 1, ' 1', '', None):
+            result = self.gate(reviews=[dict(self.reviews[0], session=session), self.reviews[1]])
+            self.assertFalse(result['allowed'])
+            self.assertIn('invalid_evidence', result['reasons'])
+        self.assertFalse(self.gate(reviews=[dict(r, p0=False) for r in self.reviews])['allowed'])
+
+    def test_missing_role_session_and_wrong_check_name_refuse(self):
+        self.assertFalse(self.gate(reviews=[dict(r, role='developer') for r in self.reviews])['allowed'])
+        self.assertFalse(self.gate(reviews=[dict(r, session=None) for r in self.reviews])['allowed'])
+        result = self.gate(checks=[dict(self.checks[0], name='other')])
+        self.assertFalse(result['allowed'])
+        self.assertIn('required_exact_head_ci_missing', result['reasons'])
+
+    def test_required_check_type_and_empty_list_refuse(self):
+        for names in ('lot2-qualification', [], ['lot2-qualification'] * 2, [['nested']]):
+            result = merge_gate(self.head, self.reviews, self.checks, names,
+                authorized=True, draft=False, mergeable=True, protections=True)
+            self.assertFalse(result['allowed'])
+
+    def test_old_failure_for_same_head_remains_conservatively_blocking(self):
+        checks = self.checks + [dict(self.checks[0], status='FAILURE')]
+        result = self.gate(checks=checks)
+        self.assertFalse(result['allowed'])
+        self.assertIn('required_check_not_success', result['reasons'])

@@ -3,8 +3,20 @@
 def merge_gate(head, reviews, checks, required_checks, authorized=False, draft=True,
                mergeable=False, protections=False):
     """Local decision simulation only. Evidence authenticity remains Orca's responsibility."""
+    def clean_text(value):
+        return isinstance(value, str) and bool(value) and value == value.strip()
+    if (not clean_text(head) or not isinstance(reviews, (list, tuple))
+            or not isinstance(checks, (list, tuple)) or not isinstance(required_checks, (list, tuple))
+            or any(not clean_text(name) for name in required_checks)
+            or len(set(required_checks)) != len(required_checks)
+            or any(not isinstance(r, dict) or not clean_text(r.get('head'))
+                   or not clean_text(r.get('session'))
+                   or any(type(r.get(k)) is not int or r[k] < 0 for k in ('p0', 'p1')) for r in reviews)
+            or any(not isinstance(c, dict) or any(not clean_text(c.get(k))
+                   for k in ('name', 'head', 'status')) for c in checks)):
+        return {'allowed': False, 'reasons': ['invalid_evidence'], 'github_merge': 'NOT_TESTED'}
     reasons = []
-    if not authorized or draft or not mergeable or not protections:
+    if authorized is not True or draft is not False or mergeable is not True or protections is not True:
         reasons.append('repository_or_platform_gate')
     valid = [r for r in reviews if r.get('head') == head and r.get('approved') is True
              and r.get('p0') == 0 and r.get('p1') == 0 and r.get('independent') is True
