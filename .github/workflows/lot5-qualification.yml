@@ -6,7 +6,7 @@ permissions:
   contents: read
 jobs:
   lot5-qualification:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, ovh-ci, "ci-control-${{ github.run_id }}-${{ github.event.pull_request.head.sha || github.sha }}"]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
